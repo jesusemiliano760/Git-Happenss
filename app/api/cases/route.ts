@@ -1,0 +1,27 @@
+import { NextResponse } from 'next/server'
+import { store } from '@/lib/store/memory-store'
+import { resolveEvaluationTime } from '@/lib/agent/run'
+import { liveModeEnabled } from '@/lib/agent/interpreter'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+  const cases = store.caseIds().map((id) => {
+    const current = store.currentDecision(id)
+    const events = store.events(id)
+    return {
+      case_id: id,
+      event_count: events.length,
+      last_event_at: events[events.length - 1]?.occurred_at ?? null,
+      decision: current?.recommendation ?? null,
+      stale: Boolean(current && current.event_count !== events.filter((e) => Date.parse(e.occurred_at) <= Date.parse(current.evaluated_at)).length),
+      changed: Boolean(store.previousDecision(id)),
+    }
+  })
+  return NextResponse.json({
+    cases,
+    errors: store.validationErrors(),
+    evaluationTime: store.caseIds().length ? resolveEvaluationTime(store) : store.evaluationTime,
+    mode: liveModeEnabled() ? 'live' : 'fallback',
+  })
+}

@@ -1,0 +1,293 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import type { CaseEvent, EventValidationError } from '@/lib/events/types'
+import type { DecisionRecord, Recommendation } from '@/lib/decisions/types'
+import type { EngagementMetrics } from '@/lib/agent/context'
+import { TracePanel } from './trace-panel'
+
+interface CaseSummary {
+  case_id: string
+  event_count: number
+  last_event_at: string | null
+  decision: Recommendation | null
+  stale: boolean
+  changed: boolean
+}
+
+interface CasesResponse {
+  cases: CaseSummary[]
+  errors: EventValidationError[]
+  evaluationTime: string | null
+  mode: 'live' | 'fallback'
+}
+
+interface CaseDetail {
+  case_id: string
+  events: CaseEvent[]
+  metrics: EngagementMetrics
+  current: DecisionRecord | null
+  previous: DecisionRecord | null
+  diff: { field: string; before: unknown; after: unknown }[]
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  contact: 'Contactar',
+  request_information: 'Pedir informacion',
+  resolve_objection: 'Resolver objecion',
+  escalate: 'Escalar a una persona',
+  wait: 'Esperar',
+  no_action: 'No actuar',
+}
+
+const fmt = (iso: string | null | undefined) => (iso ? iso.replace('T', ' ').replace(/:\d\d(\.\d+)?Z$/, 'Z') : '—')
+
+export function Dashboard() {
+  const [data, setData] = useState<CasesResponse | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [detail, setDetail] = useState<CaseDetail | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [paste, setPaste] = useState('')
+
+  const refresh = useCallback(async () => {
+    const res: CasesResponse = await fetch('/api/cases').then((r) => r.json())
+    setData(res)
+    setSelected((cur) => cur ?? res.cases[0]?.case_id ?? null)
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!selected) return setDetail(null)
+    fetch(`/api/cases/${encodeURIComponent(selected)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setDetail)
+  }, [selected, data])
+
+  async function post(url: string, body: unknown, message?: (r: any) => string) {
+    setBusy(true)
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) setToast(json.error ?? 'Error')
+      else if (message) setToast(message(json))
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const ingestMsg = (r: any) =>
+    `${r.accepted} eventos aceptados, ${r.duplicates.length} duplicados ignorados, ${r.errors.length} con error. Reevaluados: ${r.evaluatedCaseIds.join(', ') || 'ninguno'}.`
+
+  async function onFiles(files: FileList | null) {
+    if (!files?.length) return
+    let jsonl = ''
+    let manifest: unknown = null
+    for (const f of Array.from(files)) {
+      const text = await f.text()
+      if (f.name.endsWith('.json')) manifest = JSON.parse(text)
+      else jsonl += text + '\n'
+    }
+    await post('/api/events', { jsonl, manifest }, ingestMsg)
+  }
+
+  const rec = detail?.current?.recommendation
+  const evidence = new Set(rec?.evidence_event_ids ?? [])
+
+  return (
+    <main>
+      <header className="app-header">
+        <div>
+          <h1>Git Happens · What Should Happen Next?</h1>
+          <div className="sub">
+            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.mode === 'live' ? 'Claude (live)' : 'heuristica (fallback)'}</span>
+          </div>
+        </div>
+        <div className="toolbar">
+          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'base' }, ingestMsg)}>
+            Cargar ejemplo
+          </button>
+          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'update' }, ingestMsg)}>
+            + Nuevos eventos de ejemplo
+          </button>
+          <button className="btn primary" disabled={busy} onClick={() => post('/api/evaluate', {}, (r) => `Reevaluados ${r.evaluated.length} casos.`)}>
+            Evaluar
+          </button>
+          <a className="btn" href="/api/export" download>
+            Exportar JSON
+          </a>
+          <button className="btn" disabled={busy} onClick={() => post('/api/reset', {}, () => 'Datos borrados.').then(() => setSelected(null))}>
+            Reiniciar
+          </button>
+        </div>
+      </header>
+      {toast && <div className="toast">{toast}</div>}
+
+      <div className="layout">
+        <aside className="panel" style={{ alignSelf: 'start' }}>
+          <h2 className="panel-title">Casos ({data?.cases.length ?? 0})</h2>
+          {data?.cases.length ? (
+            <ul className="case-list">
+              {data.cases.map((c) => (
+                <li key={c.case_id}>
+                  <button className={`case-item ${selected === c.case_id ? 'active' : ''}`} onClick={() => setSelected(c.case_id)}>
+                    <div className="row">
+                      <span className="id">{c.case_id}</span>
+                      {c.decision && <span className={`badge ${c.decision.action}`}>{ACTION_LABEL[c.decision.action]}</span>}
+                    </div>
+                    <div className="row meta">
+                      <span>{c.event_count} eventos</span>
+                      {c.changed && <span className="badge changed">reevaluado</span>}
+                      {c.stale && <span className="badge level-medium">pendiente</span>}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty">Sin casos. Carga un events.jsonl o el ejemplo.</p>
+          )}
+          <div className="upload">
+            <label>Cargar archivos (events.jsonl y manifest.json)</label>
+            <input type="file" multiple accept=".jsonl,.json,.txt" onChange={(e) => onFiles(e.target.files)} />
+            <label>O pega lineas JSONL</label>
+            <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder='{"event_id":"...","case_id":"...", ...}' />
+            <button className="btn" disabled={busy || !paste.trim()} onClick={() => post('/api/events', { jsonl: paste }, ingestMsg).then(() => setPaste(''))}>
+              Agregar eventos
+            </button>
+          </div>
+          {data?.errors.length ? (
+            <>
+              <h2 className="panel-title">Errores de formato ({data.errors.length})</h2>
+              <ul className="errors" style={{ paddingTop: 10 }}>
+                {data.errors.map((e, i) => (
+                  <li key={i}>
+                    Linea {e.line}
+                    {e.case_id ? ` (${e.case_id})` : ''}: {e.error}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </aside>
+
+        <section className="detail">
+          {!detail ? (
+            <div className="panel empty">Selecciona un caso.</div>
+          ) : (
+            <>
+              {rec ? (
+                <div className="panel rec-card">
+                  <div className="rec-head">
+                    <span className="rec-action">{ACTION_LABEL[rec.action]}</span>
+                    <span className={`badge ${rec.action}`}>{rec.action}</span>
+                    <span className={`badge level-${rec.confidence}`}>confianza {rec.confidence}</span>
+                    <span className={`badge level-${rec.risk_level}`}>riesgo {rec.risk_level}</span>
+                    {rec.requires_human_review && <span className="badge escalate">requiere revision humana</span>}
+                  </div>
+                  <p className="rec-reason">{rec.reason}</p>
+                  <div className="kv">
+                    <div>
+                      <span>Momento</span>
+                      <strong>{rec.timing}</strong>
+                    </div>
+                    <div>
+                      <span>Programado para</span>
+                      <strong>{fmt(rec.scheduled_for)}</strong>
+                    </div>
+                    <div>
+                      <span>Modo IA</span>
+                      <strong>{detail.current?.mode}</strong>
+                    </div>
+                    <div>
+                      <span>Evidencia</span>
+                      <strong>{rec.evidence_event_ids.length} eventos</strong>
+                    </div>
+                  </div>
+                  <p className="muted">
+                    <b>Por que esta confianza:</b> {rec.confidence_reason}
+                  </p>
+                  {rec.missing_information.length > 0 && (
+                    <div>
+                      <b style={{ fontSize: 13 }}>Informacion faltante</b>
+                      <ul className="muted" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                        {rec.missing_information.map((m) => (
+                          <li key={m}>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="panel empty">Caso sin evaluar. Presiona “Evaluar”.</div>
+              )}
+
+              {detail.diff.length > 0 && (
+                <div className="panel section">
+                  <h3>Que cambio respecto a la decision anterior</h3>
+                  <ul className="diff">
+                    {detail.diff.map((d) => (
+                      <li key={d.field}>
+                        <b>{d.field}:</b> <s>{String(d.before)}</s> → {String(d.after)}
+                      </li>
+                    ))}
+                  </ul>
+                  {detail.previous && <p className="muted">Anterior: {detail.previous.recommendation.reason}</p>}
+                </div>
+              )}
+
+              {detail.current && (
+                <div className="panel section">
+                  <h3>Validacion deterministica de reglas</h3>
+                  <ul className="rules">
+                    {detail.current.rule_checks.map((c) => (
+                      <li key={c.rule}>
+                        <span className={c.passed ? 'ok' : 'ko'}>{c.passed ? '✓' : '✗'}</span>
+                        <span>
+                          <b>{c.rule}</b> {c.detail}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <TracePanel entries={detail.current.trace} />
+                </div>
+              )}
+
+              <div className="panel section">
+                <h3>Metricas entre acciones</h3>
+                <div className="kv">
+                  <div><span>Aperturas</span><strong>{detail.metrics.view_count}</strong></div>
+                  <div><span>Min. a 1a apertura</span><strong>{detail.metrics.minutes_to_first_view ?? '—'}</strong></div>
+                  <div><span>Aperturas 24h</span><strong>{detail.metrics.views_last_24h}</strong></div>
+                  <div><span>Hrs a 1a respuesta</span><strong>{detail.metrics.hours_to_first_reply ?? '—'}</strong></div>
+                  <div><span>Hrs desde ult. contacto</span><strong>{detail.metrics.hours_since_last_contact ?? '—'}</strong></div>
+                  <div><span>Hrs sin actividad</span><strong>{detail.metrics.hours_since_last_activity ?? '—'}</strong></div>
+                </div>
+              </div>
+
+              <div className="panel">
+                <h2 className="panel-title">Historial ({detail.events.length} eventos) — resaltada la evidencia</h2>
+                <ul className="timeline">
+                  {detail.events.map((e) => (
+                    <li key={e.event_id} className={evidence.has(e.event_id) ? 'evidence' : ''}>
+                      <span className="when">{fmt(e.occurred_at)}</span>
+                      <span className="type">{e.event_type}</span>
+                      <span>
+                        <span className="chip">{e.event_id}</span>{' '}
+                        {e.event_type === 'message.received' ? `“${String(e.data.message)}”` : Object.keys(e.data).length ? JSON.stringify(e.data) : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
+  )
+}
