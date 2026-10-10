@@ -50,10 +50,10 @@ export interface MessageInterpretation {
 
 const RE = {
   // Español e ingles: un cliente puede escribir "ignore all previous instructions".
-  injection: /(ignora|olvida|omite)\s+(las|tus|todas)?\s*(reglas|instrucciones)|system prompt|act[uú]a como|eres un (modelo|asistente)|nueva instrucci[oó]n|\b(ignore|disregard|forget)\s+(all\s+)?(the\s+|your\s+|any\s+)?(previous\s+|prior\s+|above\s+)?(instructions|rules|prompts?)|\byou are now\b|\bact as (an?|the)\b|\bnew instructions?\b/i,
+  injection: /(ignora|olvida|omite|ignoren|olviden|omitan)\s+(\S+\s+){0,3}(reglas|instrucciones|indicaciones)|system prompt|act[uú]a como|eres un (modelo|asistente)|nueva instrucci[oó]n|\b(ignore|disregard|forget)\s+(all\s+)?(the\s+|your\s+|any\s+)?(previous\s+|prior\s+|above\s+)?(instructions|rules|prompts?)|\byou are now\b|\bact as (an?|the)\b|\bnew instructions?\b/i,
   // Tambien el infinitivo: "no me vuelvan a contactar", "no nos vuelvan a escribir".
   noContact: /no\s+(me|nos)\s+(vuelvan a\s+)?(contacten|llamen|escriban|busquen)|no\s+(me|nos)\s+vuelvan a\s+(contactar|llamar|escribir|buscar|marcar)|dejen de (contactar|escribir|llamar)|b[aá]j(a|enme)\s+de|no quiero (que me contacten|m[aá]s mensajes)|borr(en|ar) mis datos/i,
-  notInterested: /no (nos|me) interesa|ya no (nos|me) interesa|decidimos no|elegimos (a )?otro|otro proveedor|no vamos a (seguir|continuar|contratar)|cancel(ar|amos)|descartamos/i,
+  notInterested: /no (nos|me) interesa|ya no (nos|me) interesa|decidi(mos|[oó]|eron) no|no (seguir|continuar) con (el|la|esto|esta|este)|olv[ií]d(en|e)(lo|la)\b|elegimos (a )?otro|otro proveedor|no vamos a (seguir|continuar|contratar)|cancel(ar|amos)|descartamos/i,
   wait: /(despu[eé]s|hasta|dentro de|en)\s+(de\s+)?(\d+|un|una|dos|tres|cuatro|un par de)\s+(d[ií]as?|semanas?|mes(es)?)|pr[oó]xima semana|pr[oó]ximo mes|m[aá]s adelante|regres(o|ando) de|vacaciones|antes del?\s+(\d|lunes|martes|mi[eé]rcoles|jueves|viernes|pr[oó]xim)|hasta (el|la)\s+\S+|esper(en|ar) (a|hasta)|a partir del?/i,
   objection: /caro|precio|costo|cuesta|presupuesto|descuento|no (estoy|estamos) seguros?|me preocupa|nos preocupa|competencia|garant[ií]a|plazo|tiempo de entrega|condiciones|no (me|nos) convence|objeci[oó]n/i,
   question: /\?|podr[ií]an (enviar|mandar|explicar|decir)|necesito saber|quisiera saber|me pueden|informaci[oó]n|detalles|ficha t[eé]cnica|c[oó]mo funciona/i,
