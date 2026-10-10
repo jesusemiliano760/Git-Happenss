@@ -38,7 +38,9 @@ npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit 
 
 1. En Supabase: **SQL Editor → New query**, pega `supabase/schema.sql` y **Run**.
 2. En `.env.local` pon `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (llave secreta /
-   service_role, solo servidor).
+   service_role, solo servidor). `SUPABASE_URL` es la URL base del proyecto,
+   **sin `/rest/v1`** al final (`https://<proyecto>.supabase.co`); si la
+   copias de "Data API" con `/rest/v1`, borra esa parte.
 3. `npm run check:db` → debe decir `OK` y listar las 5 tablas.
 
 El agente trabaja en memoria y **ademas** guarda en Supabase eventos,
@@ -59,9 +61,10 @@ sigue en memoria y la barra superior muestra `BD: supabase (error)`.
 | Variable | Uso |
 |---|---|
 | `GEMINI_API_KEY` | Activa el modo **live**: Gemini interpreta los mensajes. Sin ella, modo **fallback** heuristico. |
-| `GEMINI_MODEL` | Opcional, default `gemini-2.5-flash`. |
+| `GEMINI_MODEL` | Opcional, default `gemini-3.8-flash`. |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Alternativa: Claude, solo si no hay llave de Gemini. |
-| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Activan la persistencia en Supabase (opcional). |
+| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Activan la persistencia en Supabase (opcional). La URL va sin `/rest/v1`. |
+| `LLM_TIMEOUT_SECONDS` | Limite por llamada a la IA (default 20); si se pasa, se usa la heuristica. |
 | `AGENT_MODE=fallback` | Fuerza el modo sin IA (pruebas reproducibles). |
 | `HIGH_VALUE_MXN` | Umbral de monto para pedir revision humana (default 500000). |
 

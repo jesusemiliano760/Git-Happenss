@@ -8,7 +8,7 @@ async function main() {
     console.log('No hay GEMINI_API_KEY (ni ANTHROPIC_API_KEY). Agrega la llave a .env.local.')
     process.exit(1)
   }
-  console.log(`Proveedor: ${provider} · modelo: ${provider === 'gemini' ? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash' : process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'}`)
+  console.log(`Proveedor: ${provider} · modelo: ${provider === 'gemini' ? process.env.GEMINI_MODEL ?? 'gemini-3.8-flash' : process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'}`)
   const ev = {
     event_id: 'check-1',
     case_id: 'CHECK',

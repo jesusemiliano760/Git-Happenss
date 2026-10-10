@@ -15,7 +15,9 @@ import type { CaseEvent, EventValidationError } from '@/lib/events/types'
 import type { DecisionRecord } from '@/lib/decisions/types'
 import type { MessageInterpretation } from '@/lib/agent/interpreter'
 
-const URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+// La URL va sin /rest/v1 (supabase-js lo agrega). Si alguien la copia con ese
+// sufijo desde "Data API", se quita para no duplicar la ruta.
+const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '')
 const KEY = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 const PAGE = 1000
 
