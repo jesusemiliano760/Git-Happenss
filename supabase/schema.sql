@@ -72,12 +72,3 @@ select distinct on (case_id) case_id, action, timing, confidence, risk_level,
 from public.decisions
 order by case_id, created_at desc;
 
--- Seguridad: RLS activado y SIN politicas publicas. Solo el servidor de la
--- app (con la llave secreta / service_role, que nunca llega al navegador)
--- puede leer y escribir. Nadie con la llave publica puede ver los datos.
-alter table public.events          enable row level security;
-alter table public.interpretations enable row level security;
-alter table public.decisions       enable row level security;
-alter table public.ingest_errors   enable row level security;
-alter table public.app_state       enable row level security;
-alter view  public.current_decisions set (security_invoker = true);
