@@ -5,7 +5,7 @@ Agente de IA para el **Reto Byecode**: recibe eventos de propuestas comerciales
 **siguiente mejor accion — o inaccion —**, cuando hacerla, por que, con que
 evidencia, con que confianza y con que riesgo.
 
-> Idea central (lo que pidio el patrocinador en la presentacion): no es un
+>No es un
 > recomendador que siempre empuja a actuar. Esperar o no hacer nada es una
 > decision valida, y abrir una propuesta no demuestra intencion de compra.
 
