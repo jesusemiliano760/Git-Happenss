@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { store } from '@/lib/store/memory-store'
 import { resolveEvaluationTime } from '@/lib/agent/run'
-import { liveModeEnabled } from '@/lib/agent/interpreter'
+import { activeProvider } from '@/lib/agent/interpreter'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +22,7 @@ export async function GET() {
     cases,
     errors: store.validationErrors(),
     evaluationTime: store.caseIds().length ? resolveEvaluationTime(store) : store.evaluationTime,
-    mode: liveModeEnabled() ? 'live' : 'fallback',
+    mode: activeProvider() ? 'live' : 'fallback',
+    provider: activeProvider(),
   })
 }

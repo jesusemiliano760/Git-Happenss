@@ -15,7 +15,8 @@ Requisitos: Node 20+.
 
 ```bash
 npm install
-cp .env.example .env.local      # opcional: ANTHROPIC_API_KEY para usar Claude
+cp .env.example .env.local      # pon tu GEMINI_API_KEY ahi
+npm run check:ia                # verifica que la llave de Gemini funcione
 npm run dev                     # http://localhost:3000
 ```
 
@@ -37,18 +38,22 @@ npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit 
 
 | Variable | Uso |
 |---|---|
-| `ANTHROPIC_API_KEY` | Activa el modo **live** (Claude interpreta los mensajes). Sin ella, modo **fallback** heuristico. |
-| `ANTHROPIC_MODEL` | Opcional, default `claude-opus-5-5`. |
+| `GEMINI_API_KEY` | Activa el modo **live**: Gemini interpreta los mensajes. Sin ella, modo **fallback** heuristico. |
+| `GEMINI_MODEL` | Opcional, default `gemini-2.5-flash`. |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Alternativa: Claude, solo si no hay llave de Gemini. |
 | `AGENT_MODE=fallback` | Fuerza el modo sin IA (pruebas reproducibles). |
 | `HIGH_VALUE_MXN` | Umbral de monto para pedir revision humana (default 500000). |
 
 ## Como se usa la IA
 
-- **La IA interpreta, las reglas deciden lo permitido.** Claude clasifica cada
+- **La IA interpreta, las reglas deciden lo permitido.** Gemini (`@google/genai`,
+  `generateContent` con `responseJsonSchema`) clasifica cada
   `message.received` con salida estructurada (JSON validado por esquema):
   intencion, objecion, fecha pedida para retomar, hechos vs inferencias,
   informacion faltante, confianza y si el texto parece una instruccion
-  inyectada. El mensaje va delimitado y se trata como dato.
+  inyectada. El mensaje va delimitado y se trata como dato. La respuesta se
+  valida otra vez con Zod y se guarda por `event_id` (no se paga dos veces el
+  mismo mensaje).
 - Si no hay API key o la llamada falla, un clasificador heuristico en español
   produce la misma estructura (`source: "heuristic"`). La app nunca se cae.
 - La politica (`lib/agent/policy.ts`) combina hechos + inferencias y propone
@@ -89,4 +94,4 @@ docs/                nota tecnica, demo, notas del audio, rescate de Banorte One
 ```
 
 Ver `docs/NOTA_TECNICA.md` (entregable de 1 pagina), `docs/DEMO.md`,
-`docs/NOTAS_AUDIO.md` y `docs/RESCATE_BANORTE.md`.
+y `docs/NOTAS_AUDIO.md`.

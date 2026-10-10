@@ -9,8 +9,11 @@ publicacion. Cada evaluacion se guarda; la anterior se conserva para mostrar
 el diff. La hora "actual" es `manifest.evaluation_at` (nunca el reloj real),
 y los eventos posteriores a esa hora se ignoran.
 
-**IA utilizada.** Claude (`claude-opus-5-5` por defecto, configurable) via
-`@anthropic-ai/sdk` con salida estructurada (esquema Zod). Solo interpreta
+**IA utilizada.** Gemini (`gemini-2.5-flash` por defecto, configurable con
+`GEMINI_MODEL`) via `@google/genai`, `generateContent` con
+`responseMimeType: application/json` y `responseJsonSchema`, temperatura 0; la
+salida se revalida con Zod. Claude queda como alternativa si no hay llave de
+Gemini. Solo interpreta
 `message.received`: intencion (`interested`, `objection`,
 `requests_information`, `provides_information`, `requests_wait`,
 `not_interested`, `ambiguous`), tema de objecion, fecha pedida para retomar,

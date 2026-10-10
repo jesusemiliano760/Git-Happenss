@@ -10,7 +10,7 @@
 // Banorte One: muestra al jurado cada paso y que regla se valido.
 
 import { buildContext } from './context'
-import { interpretMessage, liveModeEnabled, type MessageInterpretation } from './interpreter'
+import { interpretMessage, type MessageInterpretation } from './interpreter'
 import { decide, safeFallback } from './policy'
 import { allowedActions, hardViolations, validateRecommendation } from '@/lib/rules/engine'
 import type { CaseEvent } from '@/lib/events/types'
@@ -74,7 +74,8 @@ export async function evaluateCase(caseId: string, events: CaseEvent[], now: str
   return {
     recommendation,
     evaluated_at: now,
-    mode: liveModeEnabled() ? 'live' : 'fallback',
+    // 'live' solo si la IA externa realmente interpreto algun mensaje del caso.
+    mode: [...interps.values()].some((i) => i.source === 'llm') ? 'live' : 'fallback',
     proposed,
     rule_checks: checks,
     trace,

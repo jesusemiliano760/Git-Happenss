@@ -20,6 +20,7 @@ interface CasesResponse {
   errors: EventValidationError[]
   evaluationTime: string | null
   mode: 'live' | 'fallback'
+  provider: 'gemini' | 'claude' | null
 }
 
 interface CaseDetail {
@@ -104,7 +105,7 @@ export function Dashboard() {
         <div>
           <h1>Git Happens · What Should Happen Next?</h1>
           <div className="sub">
-            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.mode === 'live' ? 'Claude (live)' : 'heuristica (fallback)'}</span>
+            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.provider === 'gemini' ? 'Gemini (live)' : data?.provider === 'claude' ? 'Claude (live)' : 'heuristica (fallback)'}</span>
           </div>
         </div>
         <div className="toolbar">
