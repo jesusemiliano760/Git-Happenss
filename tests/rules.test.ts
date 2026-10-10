@@ -194,3 +194,18 @@ test('Evento con fecha posterior a la evaluacion -> se ignora y se menciona', as
   ])
   assert.match(rec.reason, /posterior a la hora de evaluaci/)
 })
+
+test('Sin mensajes ni aperturas -> el faltante no menciona aperturas', async () => {
+  const rec = await decideFor([opened('NV')])
+  assert.ok(rec.missing_information.some((m) => /ni aperturas/.test(m)))
+  assert.ok(!rec.missing_information.some((m) => /señales indirectas/.test(m)))
+})
+
+test('Objeción en modo respaldo -> tema fijo, no la palabra suelta', async () => {
+  const rec = await decideFor([
+    opened('OT'),
+    ev('OT', 'message.received', '2026-10-09T10:00:00Z', { message: 'Me preocupa el plazo de implementación.' }),
+  ])
+  assert.equal(rec.action, 'resolve_objection')
+  assert.match(rec.reason, /objeción explícita \(plazo\)/)
+})

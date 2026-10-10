@@ -64,7 +64,11 @@ export function baseMissingInformation(ctx: CaseContext): string[] {
   if (!ctx.opened) missing.push('Evento case.opened (estado y monto de la propuesta)')
   else if (ctx.proposal_amount_mxn === null) missing.push('Monto de la propuesta (proposal_amount_mxn)')
   else if (!(ctx.proposal_amount_mxn > 0)) missing.push(`Monto de la propuesta válido: se recibió ${ctx.proposal_amount_mxn} MXN, que no es un monto real`)
-  if (ctx.messages.length === 0) missing.push('Respuesta explícita del cliente: solo hay señales indirectas (aperturas)')
+  if (ctx.messages.length === 0) {
+    missing.push(ctx.views.length > 0
+      ? 'Respuesta explícita del cliente: solo hay señales indirectas (aperturas)'
+      : 'Respuesta del cliente: no hay mensajes ni aperturas registradas')
+  }
   return missing
 }
 
