@@ -1,7 +1,8 @@
 // Persistencia en Supabase (opcional). El agente sigue trabajando sobre el
 // CaseStore en memoria; esta capa:
-//   - al arrancar, carga eventos, interpretaciones y decisiones desde Supabase
-//     (hydrate) para continuar donde se quedo;
+//   - en cada peticion, arma el estado desde Supabase (eventos,
+//     interpretaciones y decisiones) para continuar donde se quedo, aunque el
+//     servidor tenga varias copias (Vercel);
 //   - despues de cada carga/evaluacion, escribe lo nuevo.
 // Ninguna funcion lanza errores: si Supabase falla o no esta configurado, la
 // app sigue en memoria (misma filosofia que el FALLBACK de Banorte One).
@@ -10,7 +11,8 @@
 // NEXT_PUBLIC_ ni usarse en el navegador.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { CaseStore } from './memory-store'
+import { CaseStore } from './memory-store'
+import { toIso } from '@/lib/agent/context'
 import type { CaseEvent, EventValidationError } from '@/lib/events/types'
 import type { DecisionRecord } from '@/lib/decisions/types'
 import type { MessageInterpretation } from '@/lib/agent/interpreter'
@@ -64,18 +66,15 @@ async function selectAll<T>(table: string, order: string): Promise<T[]> {
   }
 }
 
-// --- Lectura al arrancar ----------------------------------------------------
+// --- Lectura -----------------------------------------------------------------
 
-const g = globalThis as unknown as { __supabaseHydrated?: Promise<void> }
-
-export function ensureHydrated(store: CaseStore, interpCache: Map<string, MessageInterpretation>): Promise<void> {
-  if (!supabaseEnabled()) return Promise.resolve()
-  g.__supabaseHydrated ??= hydrate(store, interpCache)
-  return g.__supabaseHydrated
-}
-
-async function hydrate(store: CaseStore, interpCache: Map<string, MessageInterpretation>) {
-  await safe('hydrate', async () => {
+// En un servidor sin estado (Vercel) cada peticion puede caer en una copia
+// distinta del proceso, asi que la memoria de una copia no ve lo que escribio
+// otra. Con Supabase activo se arma un CaseStore NUEVO por peticion a partir
+// de la BD (los datos del reto son pocos, cuesta milisegundos). Devuelve null
+// si Supabase falla, para que la ruta use la memoria local.
+export async function loadStoreFromSupabase(interpCache: Map<string, MessageInterpretation>): Promise<CaseStore | null> {
+  return safe('cargar', async () => {
     const [events, interps, decisions, errors, state] = await Promise.all([
       selectAll<CaseEvent & { ingested_at: string }>('events', 'occurred_at'),
       selectAll<{ event_id: string; interpretation: MessageInterpretation }>('interpretations', 'created_at'),
@@ -83,8 +82,10 @@ async function hydrate(store: CaseStore, interpCache: Map<string, MessageInterpr
       selectAll<EventValidationError>('ingest_errors', 'id'),
       selectAll<{ key: string; value: unknown }>('app_state', 'key'),
     ])
+    const store = new CaseStore()
+    // Postgres regresa "2026-10-09T15:00:00+00:00"; se normaliza al formato del kit.
     store.ingestEvents(
-      events.map((e) => ({ event_id: e.event_id, case_id: e.case_id, event_type: e.event_type, occurred_at: e.occurred_at, data: e.data })),
+      events.map((e) => ({ event_id: e.event_id, case_id: e.case_id, event_type: e.event_type, occurred_at: toIso(Date.parse(e.occurred_at)), data: e.data })),
     )
     for (const r of interps) {
       interpCache.set(r.event_id, r.interpretation)
@@ -94,7 +95,7 @@ async function hydrate(store: CaseStore, interpCache: Map<string, MessageInterpr
     store.restoreErrors(errors.map((e) => ({ line: e.line, case_id: e.case_id ?? undefined, event_id: e.event_id ?? undefined, error: e.error, raw: e.raw })))
     const t = state.find((s) => s.key === 'evaluation_at')?.value
     if (typeof t === 'string') store.evaluationTime = t
-    console.log(`[supabase] cargados ${events.length} eventos, ${decisions.length} decisiones`)
+    return store
   })
 }
 
@@ -114,7 +115,7 @@ interface DecisionRow {
 function rowToRecord(d: DecisionRow): DecisionRecord {
   return {
     recommendation: d.recommendation,
-    evaluated_at: d.evaluated_at,
+    evaluated_at: toIso(Date.parse(d.evaluated_at)),
     mode: d.mode,
     proposed: d.proposed,
     rule_checks: d.rule_checks,

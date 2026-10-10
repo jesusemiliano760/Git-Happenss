@@ -1,14 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { NextResponse } from 'next/server'
-import { ready, saveEvaluation, saveIngest, store } from '@/lib/store/server'
+import { getStore, saveEvaluation, saveIngest } from '@/lib/store/server'
 import { evaluateCases } from '@/lib/agent/run'
 import { manifestEvaluationTime } from '@/lib/events/types'
 
 // Carga de eventos JSONL (archivo, formulario o este endpoint; seccion 2).
 // Body: { jsonl?: string, manifest?: object, sample?: 'kit' | 'kit-update' | 'base' | 'update', evaluate?: boolean }
 export async function POST(request: Request) {
-  await ready()
+  const store = await getStore()
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Body JSON invalido' }, { status: 400 })
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (!jsonl.trim()) return NextResponse.json({ error: 'No se recibieron eventos' }, { status: 400 })
 
   const result = store.ingestJsonl(jsonl)
-  await saveIngest(result)
+  await saveIngest(store, result)
   const evaluated = body.evaluate === false ? {} : await evaluateCases(store, result.affectedCaseIds)
   await saveEvaluation(evaluated)
 
