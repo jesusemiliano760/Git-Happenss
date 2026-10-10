@@ -96,6 +96,20 @@ export function inferRequestedDate(text: string, sentAt: string): string | null 
   return null
 }
 
+// Tema fijo de la objecion (no la palabra suelta que encontro el regex).
+const TOPICS: [RegExp, string][] = [
+  [/caro|barato|precio|costo|cuesta|presupuesto|descuento|\biva\b/i, 'precio'],
+  [/plazo|tiempo de entrega|implementaci[oó]n|cu[aá]ndo (estar[ií]a|queda)/i, 'plazo'],
+  [/garant[ií]a/i, 'garantía'],
+  [/condiciones|forma de pago|pagos?\b/i, 'condiciones de pago'],
+  [/competencia|otra cotizaci[oó]n|otro proveedor/i, 'comparación con la competencia'],
+  [/incluye|alcance|soporte|instalaci[oó]n|capacitaci[oó]n/i, 'alcance'],
+]
+
+export function objectionTopic(text: string): string {
+  return TOPICS.find(([re]) => re.test(text))?.[1] ?? 'tema no especificado'
+}
+
 export function interpretHeuristic(ev: CaseEvent): MessageInterpretation {
   const text = String(ev.data.message ?? '')
   const facts = [`Mensaje recibido el ${ev.occurred_at}: "${text.slice(0, 200)}"`]
@@ -123,7 +137,7 @@ export function interpretHeuristic(ev: CaseEvent): MessageInterpretation {
     if (!requested) missing.push('Fecha concreta en la que el cliente acepta ser contactado')
   } else if (RE.objection.test(text)) {
     intent = 'objection'
-    objection_topic = (text.match(RE.objection)?.[0] ?? 'no especificado').toLowerCase()
+    objection_topic = objectionTopic(text)
     confidence = 'medium'
     inferences.push(`El cliente expresa una duda u objeción sobre: ${objection_topic}.`)
   } else if (RE.interested.test(text)) {
