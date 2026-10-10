@@ -11,6 +11,7 @@ import { toIso, type CaseContext } from './context'
 import type { MessageInterpretation } from './interpreter'
 import type { ActionGate } from '@/lib/rules/engine'
 import type { Action, Level, Recommendation, Timing } from '@/lib/decisions/types'
+import type { CaseEvent } from '@/lib/events/types'
 
 // Umbral a partir del cual una propuesta se considera de alto valor y se pide
 // revision humana en decisiones delicadas. Ajustable sin tocar la logica.
@@ -107,7 +108,8 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
     return {
       action: 'no_action',
       timing: 'not_applicable',
-      reason: `El caso se cerro (status=${ctx.status}) en ${ctx.closed.occurred_at}. Un cierre es definitivo: no hay intervencion valida.`,
+      // El status del cierre, no el actual (un case.opened posterior lo cambia).
+      reason: `El caso se cerro (status=${closedStatus(ctx.closed)}) en ${ctx.closed.occurred_at}. Un cierre es definitivo: no hay intervencion valida.`,
       evidence: [ctx.closed.event_id],
       confidence: 'high',
       confidence_reason: 'Hecho observado: existe un evento case.closed. No depende de interpretacion.',
@@ -431,4 +433,9 @@ export function safeFallback(ctx: CaseContext, gate: ActionGate, why: string): R
     requires_human_review: true,
     missing_information: baseMissingInformation(ctx),
   }
+}
+
+function closedStatus(ev: CaseEvent): string {
+  const s = (ev.data as Record<string, unknown> | undefined)?.status
+  return typeof s === 'string' ? s : 'closed'
 }
