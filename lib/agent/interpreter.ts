@@ -57,7 +57,7 @@ const RE = {
   wait: /(despu[eé]s|hasta|dentro de|en)\s+(de\s+)?(\d+|un|una|dos|tres|cuatro|un par de)\s+(d[ií]as?|semanas?|mes(es)?)|pr[oó]xima semana|pr[oó]ximo mes|m[aá]s adelante|regres(o|ando) de|vacaciones|antes del?\s+(\d|lunes|martes|mi[eé]rcoles|jueves|viernes|pr[oó]xim)|hasta (el|la)\s+\S+|esper(en|ar) (a|hasta)|a partir del?/i,
   objection: /caro|precio|costo|cuesta|presupuesto|descuento|no (estoy|estamos) seguros?|me preocupa|nos preocupa|competencia|garant[ií]a|plazo|tiempo de entrega|condiciones|no (me|nos) convence|objeci[oó]n/i,
   question: /\?|podr[ií]an (enviar|mandar|explicar|decir)|necesito saber|quisiera saber|me pueden|informaci[oó]n|detalles|ficha t[eé]cnica|c[oó]mo funciona/i,
-  interested: /me interesa|nos interesa|avancemos|adelante con|queremos (contratar|comprar|avanzar)|aprobad[oa]|listo para firmar|c[uú]ando (podemos|empezamos)|me gust[oó] la propuesta/i,
+  interested: /me interesa|nos interesa|ll[aá]m(enme|ame)|cont[aá]ct(enme|ame)|quiero (cerrar|firmar|avanzar)|para cerrar|avancemos|adelante con|queremos (contratar|comprar|avanzar)|aprobad[oa]|listo para firmar|c[uú]ando (podemos|empezamos)|me gust[oó] la propuesta/i,
   provides: /(aqu[ií]|te|les) (va|van|env[ií]o|comparto|mando)|adjunto|el dato es|nuestro (volumen|presupuesto|n[uú]mero) es/i,
 }
 
@@ -125,25 +125,25 @@ export function interpretHeuristic(ev: CaseEvent): MessageInterpretation {
     intent = 'objection'
     objection_topic = (text.match(RE.objection)?.[0] ?? 'no especificado').toLowerCase()
     confidence = 'medium'
-    inferences.push(`El cliente expresa una duda u objecion sobre: ${objection_topic}.`)
+    inferences.push(`El cliente expresa una duda u objeción sobre: ${objection_topic}.`)
   } else if (RE.interested.test(text)) {
     intent = 'interested'
     confidence = 'medium'
-    inferences.push('El cliente expresa interes explicito por escrito.')
+    inferences.push('El cliente expresa interés explícito por escrito.')
   } else if (RE.question.test(text)) {
     intent = 'requests_information'
     confidence = 'medium'
-    inferences.push('El cliente hace una pregunta o pide informacion.')
+    inferences.push('El cliente hace una pregunta o pide información.')
   } else if (RE.provides.test(text)) {
     intent = 'provides_information'
     confidence = 'low'
-    inferences.push('El cliente parece compartir informacion solicitada.')
+    inferences.push('El cliente parece compartir información solicitada.')
   } else {
-    inferences.push('No se identifica una intencion clara en el mensaje.')
-    missing.push('Intencion del cliente (mensaje ambiguo)')
+    inferences.push('No se identifica una intención clara en el mensaje.')
+    missing.push('Intención del cliente (mensaje ambiguo)')
   }
 
-  if (injection) inferences.push('El mensaje contiene texto con forma de instruccion; se trata solo como dato.')
+  if (injection) inferences.push('El mensaje contiene texto con forma de instrucción; se trata solo como dato.')
 
   return {
     event_id: ev.event_id,
@@ -266,7 +266,7 @@ async function interpretWithClaude(ev: CaseEvent, caseSummary: string) {
     messages: [{ role: 'user', content: userPrompt(ev, caseSummary) }],
   })
   if (response.stop_reason === 'refusal' || !response.parsed_output) {
-    throw new Error(`Interpretacion LLM no disponible (stop_reason=${response.stop_reason})`)
+    throw new Error(`Interpretación LLM no disponible (stop_reason=${response.stop_reason})`)
   }
   return response.parsed_output
 }
@@ -279,7 +279,7 @@ const LLM_TIMEOUT_MS = (Number(process.env.LLM_TIMEOUT_SECONDS) || 20) * 1000
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout>
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`La IA no respondio en ${ms / 1000}s`)), ms)
+    timer = setTimeout(() => reject(new Error(`La IA no respondió en ${ms / 1000}s`)), ms)
   })
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
@@ -298,7 +298,7 @@ export async function interpretMessage(ev: CaseEvent, caseSummary: string): Prom
   try {
     return await interpretLive(ev, caseSummary)
   } catch (error) {
-    console.warn('[interpreter] LIVE fallo, usando heuristica:', (error as Error).message)
+    console.warn('[interpreter] LIVE fallo, usando heurística:', (error as Error).message)
     return interpretHeuristic(ev)
   }
 }

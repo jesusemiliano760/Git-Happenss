@@ -1,11 +1,17 @@
 # Guion de demo (max. 5 min) — con el kit oficial
 
-1. **Carga** (30 s): "Cargar kit oficial". Señalar: hora de evaluacion
+0. **Antes de la demo:** correr `npm run check:ia`; si Gemini no responde
+   (503/429), cambiar `GEMINI_MODEL` a otro modelo de la lista. Presionar
+   "Reiniciar" una vez con Gemini activo para que los mensajes del kit queden
+   interpretados por la IA y **no reiniciar el servidor** después.
+1. **Carga** (30 s): "Reiniciar" (carga el kit oficial). Señalar: hora de evaluacion
    `2026-10-09T16:00Z` tomada del manifest (no del reloj) y el duplicado de P02
    ignorado.
 2. **Decision inicial + evidencia** (1 min): P01 — "¿La propuesta incluye
    instalacion?" → `resolve_objection`, con el mensaje citado y resaltado en el
-   historial. Abrir la "Traza del agente".
+   historial. Señalar las tres columnas **Hechos observados / Inferencias /
+   Información faltante** (lo que se vio, lo que interpretó la IA y lo que no
+   se sabe). Abrir la "Traza del agente".
 3. **Inaccion** (1 min): P02 — una sola apertura de la seccion de precio →
    `wait` 24h: puede ser interes o curiosidad, no justifica urgencia ni
    descuentos (R5). P03 → `wait` hasta el 12-oct 15:00 (igual al ejemplo

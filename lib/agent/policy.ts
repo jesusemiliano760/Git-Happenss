@@ -22,14 +22,16 @@ export const FOLLOW_UP_GAP_DAYS = 3
 const DAY = 24 * 60 * 60 * 1000
 
 const INTENT_ES: Record<string, string> = {
-  interested: 'expreso interes',
-  objection: 'expreso una objecion',
+  interested: 'expresó interés',
+  objection: 'expresó una objeción',
   requests_information: 'hizo una pregunta',
-  provides_information: 'compartio informacion',
-  requests_wait: 'pidio esperar',
-  not_interested: 'rechazo la propuesta',
-  ambiguous: 'escribio un mensaje ambiguo',
+  provides_information: 'compartió información',
+  requests_wait: 'pidió esperar',
+  not_interested: 'rechazó la propuesta',
+  ambiguous: 'escribió un mensaje ambiguo',
 }
+
+const SOURCE_ES: Record<MessageInterpretation['source'], string> = { llm: 'IA', heuristic: 'reglas de respaldo' }
 
 function quote(text: unknown, max = 140) {
   const t = String(text ?? '').trim()
@@ -61,7 +63,8 @@ export function baseMissingInformation(ctx: CaseContext): string[] {
   const missing: string[] = []
   if (!ctx.opened) missing.push('Evento case.opened (estado y monto de la propuesta)')
   else if (ctx.proposal_amount_mxn === null) missing.push('Monto de la propuesta (proposal_amount_mxn)')
-  if (ctx.messages.length === 0) missing.push('Respuesta explicita del cliente: solo hay senales indirectas (aperturas)')
+  else if (!(ctx.proposal_amount_mxn > 0)) missing.push(`Monto de la propuesta válido: se recibió ${ctx.proposal_amount_mxn} MXN, que no es un monto real`)
+  if (ctx.messages.length === 0) missing.push('Respuesta explícita del cliente: solo hay señales indirectas (aperturas)')
   return missing
 }
 
@@ -73,12 +76,18 @@ export function decide(
   const draft = decideDraft(ctx, interps, gate)
   const missing = [...new Set([...baseMissingInformation(ctx), ...(draft.missing ?? [])])]
   const evidence = [...new Set(draft.evidence.filter((x): x is string => Boolean(x)))]
+  // Eventos con fecha posterior a la hora de evaluacion: no se usan, pero se
+  // dice explicitamente para que la explicacion no parezca contradecir el
+  // historial que ve el usuario.
+  const futureNote = ctx.future_events_ignored
+    ? ` Se ignoraron ${ctx.future_events_ignored} evento(s) con fecha posterior a la hora de evaluación (${ctx.now}).`
+    : ''
   return {
     case_id: ctx.case_id,
     action: draft.action,
     timing: draft.timing,
     scheduled_for: draft.timing === 'at_date' ? draft.scheduled_for ?? null : null,
-    reason: draft.reason,
+    reason: draft.reason + futureNote,
     evidence_event_ids: evidence.length ? evidence : ctx.events.slice(-1).map((e) => e.event_id),
     confidence: draft.confidence,
     confidence_reason: draft.confidence_reason,
@@ -101,7 +110,7 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
   const lastInterp = ctx.last_message ? interps.get(ctx.last_message.event_id) : undefined
   const pending = pendingMsg ? interps.get(pendingMsg.event_id) : undefined
   const injection = [...interps.values()].some((i) => i.injection_suspected)
-  const injectionNote = injection ? ' Un mensaje contiene texto con forma de instruccion; se trato solo como dato.' : ''
+  const injectionNote = injection ? ' Un mensaje contiene texto con forma de instrucción; se trató solo como dato.' : ''
 
   // 1) R1: caso cerrado.
   if (ctx.closed) {
@@ -109,10 +118,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
       action: 'no_action',
       timing: 'not_applicable',
       // El status del cierre, no el actual (un case.opened posterior lo cambia).
-      reason: `El caso se cerro (status=${closedStatus(ctx.closed)}) en ${ctx.closed.occurred_at}. Un cierre es definitivo: no hay intervencion valida.`,
+      reason: `El caso se cerró (status=${closedStatus(ctx.closed)}) en ${ctx.closed.occurred_at}. Un cierre es definitivo: no hay intervención válida.`,
       evidence: [ctx.closed.event_id],
       confidence: 'high',
-      confidence_reason: 'Hecho observado: existe un evento case.closed. No depende de interpretacion.',
+      confidence_reason: 'Hecho observado: existe un evento case.closed. No depende de interpretación.',
       risk_level: 'low',
     }
   }
@@ -124,10 +133,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
     return {
       action: 'no_action',
       timing: 'not_applicable',
-      reason: `El ultimo mensaje del cliente (${quote(ctx.last_message?.data.message)}) intenta dar instrucciones al agente para saltarse las reglas. Las instrucciones en mensajes no sustituyen politicas: no se obedece, no se ofrece ningun descuento y se recomienda no actuar sobre este caso.`,
+      reason: `El último mensaje del cliente (${quote(ctx.last_message?.data.message)}) intenta dar instrucciones al agente para saltarse las reglas. Las instrucciones en mensajes no sustituyen políticas: no se obedece, no se ofrece ningún descuento y se recomienda no actuar sobre este caso.`,
       evidence: [ctx.last_message?.event_id, openedId],
       confidence: 'high',
-      confidence_reason: `El mensaje tiene forma de instruccion (detectado por ${lastInterp.source === 'llm' ? 'la IA' : 'la heuristica'}); se trata solo como dato.`,
+      confidence_reason: `El mensaje tiene forma de instrucción (detectado por ${lastInterp.source === 'llm' ? 'la IA' : 'la heurística'}); se trata solo como dato.`,
       risk_level: 'low',
       requires_human_review: false,
     }
@@ -139,11 +148,11 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
       action: 'escalate',
       timing: 'immediate',
       reason:
-        'El cliente pidio por escrito no ser contactado. Se escala para que una persona registre la restriccion y decida si se cierra el caso; no se envia ningun mensaje al cliente.' +
+        'El cliente pidió por escrito no ser contactado. Se escala para que una persona registre la restricción y decida si se cierra el caso; no se envía ningún mensaje al cliente.' +
         injectionNote,
       evidence: [ctx.last_message?.event_id, openedId],
       confidence: lastInterp.confidence === 'low' ? 'medium' : lastInterp.confidence,
-      confidence_reason: `Interpretacion (${lastInterp.source}) del ultimo mensaje: solicitud de no contacto. Es una inferencia sobre texto libre, por eso se pide revision humana.`,
+      confidence_reason: `Interpretación (${SOURCE_ES[lastInterp.source]}) del último mensaje: solicitud de no contacto. Es una inferencia sobre texto libre, por eso se pide revisión humana.`,
       risk_level: 'high',
       requires_human_review: true,
     }
@@ -154,10 +163,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
     return {
       action: 'no_action',
       timing: 'not_applicable',
-      reason: 'El ultimo mensaje del cliente rechaza la propuesta. Insistir tiene mas riesgo que beneficio; se recomienda que una persona confirme y cierre el caso.',
+      reason: 'El último mensaje del cliente rechaza la propuesta. Insistir tiene más riesgo que beneficio; se recomienda que una persona confirme y cierre el caso.',
       evidence: [ctx.last_message?.event_id, openedId],
       confidence: lastInterp.confidence,
-      confidence_reason: `Inferencia (${lastInterp.source}) sobre el texto del cliente; el caso aun no tiene case.closed.`,
+      confidence_reason: `Inferencia (${SOURCE_ES[lastInterp.source]}) sobre el texto del cliente; el caso aún no tiene case.closed.`,
       risk_level: 'low',
       requires_human_review: true,
     }
@@ -165,15 +174,18 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
 
   // 5) R2: contacto prohibido.
   if (!ctx.contact_allowed) {
-    const clientWaiting = pending && ['objection', 'requests_information', 'interested'].includes(pending.intent)
+    // Cualquier mensaje del cliente que espera respuesta (incluso uno ambiguo
+    // como "llamenme para cerrar") se escala: una persona decide si la
+    // restriccion sigue vigente. Rechazos y pausas no se escalan.
+    const clientWaiting = pending && !['not_interested', 'requests_wait'].includes(pending.intent)
     if (clientWaiting) {
       return {
         action: 'escalate',
         timing: 'immediate',
-        reason: `El cliente ${INTENT_ES[pending.intent]} (${quote(pendingMsg?.data.message)}), pero contact_allowed=false prohibe contactarlo. Se escala a revision interna; no se redacta ni envia ningun mensaje al cliente.${injectionNote}`,
+        reason: `El cliente ${INTENT_ES[pending.intent]} (${quote(pendingMsg?.data.message)}), pero contact_allowed=false prohíbe contactarlo. Se escala a revisión interna; no se redacta ni envía ningún mensaje al cliente.${injectionNote}`,
         evidence: [pendingMsg?.event_id, ctx.contact_allowed_event?.event_id],
         confidence: 'high',
-        confidence_reason: 'La restriccion es un hecho observado (constraint.updated) y hay un mensaje del cliente pendiente.',
+        confidence_reason: 'La restricción es un hecho observado (constraint.updated) y hay un mensaje del cliente pendiente.',
         risk_level: 'high',
         requires_human_review: true,
       }
@@ -181,10 +193,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
     return {
       action: 'wait',
       timing: 'on_new_information',
-      reason: 'contact_allowed=false prohibe contactar. Reevaluar cuando llegue un constraint.updated que lo permita o un nuevo mensaje del cliente.',
+      reason: 'contact_allowed=false prohíbe contactar. Reevaluar cuando llegue un constraint.updated que lo permita o un nuevo mensaje del cliente.',
       evidence: [ctx.contact_allowed_event?.event_id, openedId],
       confidence: 'high',
-      confidence_reason: 'Decision determinada por una restriccion explicita (R2), no por interpretacion.',
+      confidence_reason: 'Decisión determinada por una restricción explícita (R2), no por interpretación.',
       risk_level: 'medium',
       requires_human_review: highValue,
     }
@@ -201,12 +213,12 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         action: 'wait',
         timing: 'at_date',
         scheduled_for: at,
-        reason: `El cliente pidio no ser contactado antes de ${requested.replace(':00Z', 'Z')}${matchesConstraint ? ' y existe la restriccion contact_not_before correspondiente' : ''}. Esperar y reevaluar en esa fecha, o antes si llega un mensaje nuevo.`,
+        reason: `El cliente pidió no ser contactado antes de ${requested.replace(':00Z', 'Z')}${matchesConstraint ? ' y existe la restricción contact_not_before correspondiente' : ''}. Esperar y reevaluar en esa fecha, o antes si llega un mensaje nuevo.`,
         evidence: [ctx.last_message?.event_id, matchesConstraint ? ctx.contact_not_before_event?.event_id : null],
         confidence: matchesConstraint ? 'high' : lastInterp.confidence,
         confidence_reason: matchesConstraint
-          ? 'La solicitud temporal explicita del cliente y la restriccion estructurada (contact_not_before) coinciden; no conocemos su intencion de compra.'
-          : `La fecha se infirio (${lastInterp.source}) del texto del cliente; si el mensaje es vago, la fecha exacta puede variar.`,
+          ? 'La solicitud temporal explícita del cliente y la restricción estructurada (contact_not_before) coinciden; no conocemos su intención de compra.'
+          : `La fecha se infirió (${SOURCE_ES[lastInterp.source]}) del texto del cliente; si el mensaje es vago, la fecha exacta puede variar.`,
         risk_level: 'low',
         missing: lastInterp.missing_information,
       }
@@ -215,7 +227,7 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
       return {
         action: 'wait',
         timing: 'on_new_information',
-        reason: 'El cliente pidio posponer sin fecha concreta. Respetar la pausa y reevaluar cuando escriba de nuevo.',
+        reason: 'El cliente pidió posponer sin fecha concreta. Respetar la pausa y reevaluar cuando escriba de nuevo.',
         evidence: [ctx.last_message?.event_id],
         confidence: 'medium',
         confidence_reason: 'La solicitud de espera es clara pero no tiene fecha verificable.',
@@ -235,10 +247,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
       scheduled_for: gate.earliestContact,
       reason: isR3
         ? `Existe contact_not_before=${ctx.contact_not_before}. Reevaluar en esa fecha${pending ? ' y atender el mensaje pendiente del cliente' : ''}.`
-        : `Ya se contacto al cliente hace menos de 24h sin respuesta nueva (R4). Reevaluar a partir de ${gate.earliestContact}.`,
+        : `Ya se contactó al cliente hace menos de 24h sin respuesta nueva (R4). Reevaluar a partir de ${gate.earliestContact}.`,
       evidence: [isR3 ? ctx.contact_not_before_event?.event_id : ctx.last_contact_action?.event_id, pendingMsg?.event_id],
       confidence: 'high',
-      confidence_reason: 'Decision determinada por una regla de tiempo verificable.',
+      confidence_reason: 'Decisión determinada por una regla de tiempo verificable.',
       risk_level: pending && pending.intent !== 'ambiguous' ? 'medium' : 'low',
       requires_human_review: Boolean(pending && highValue),
     }
@@ -247,11 +259,11 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
   // 8) Hay un mensaje del cliente sin atender.
   if (pending && pendingMsg) {
     const conf = pending.confidence
-    const confReason = `Basado en la interpretacion (${pending.source}) del mensaje ${pendingMsg.event_id}. ${pending.inferences[0] ?? ''}`.trim()
-    const said = `El cliente escribio ${quote(pendingMsg.data.message)}.`
+    const confReason = `Basado en la interpretación (${SOURCE_ES[pending.source]}) del mensaje ${pendingMsg.event_id}. ${pending.inferences[0] ?? ''}`.trim()
+    const said = `El cliente escribió ${quote(pendingMsg.data.message)}.`
     // R4: un message.received posterior al ultimo contacto libera la espera.
     const r4Note = ctx.last_contact_action
-      ? ` El mensaje llego despues del ultimo contacto (${ctx.last_contact_action.event_id}), por lo que la espera de 24h ya no aplica (R4).`
+      ? ` El mensaje llegó después del último contacto (${ctx.last_contact_action.event_id}), por lo que la espera de 24h ya no aplica (R4).`
       : ''
     switch (pending.intent) {
       case 'objection':
@@ -259,7 +271,7 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         return {
           action: 'resolve_objection',
           timing: 'immediate',
-          reason: `${said} Es ${pending.intent === 'objection' ? `una objecion explicita (${pending.objection_topic ?? 'tema no especificado'})` : 'una duda explicita'}: conviene aclararla sin ofrecer descuentos ni presionar el cierre.${r4Note}${injectionNote}`,
+          reason: `${said} Es ${pending.intent === 'objection' ? `una objeción explícita (${pending.objection_topic ?? 'tema no especificado'})` : 'una duda explícita'}: conviene aclararla sin ofrecer descuentos ni presionar el cierre.${r4Note}${injectionNote}`,
           evidence: [pendingMsg.event_id, ctx.last_contact_action?.event_id, openedId],
           confidence: conf,
           confidence_reason: confReason,
@@ -272,8 +284,8 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
           action: highValue ? 'escalate' : 'contact',
           timing: highValue ? 'immediate' : 'within_24h',
           reason: highValue
-            ? `El cliente expreso interes por escrito en una propuesta de alto valor (${ctx.proposal_amount_mxn} MXN). Se escala a una persona responsable para el siguiente paso.`
-            : `${said} Dar seguimiento breve para acordar el siguiente paso, sin asumir que la compra esta decidida.${r4Note}`,
+            ? `El cliente expresó interés por escrito en una propuesta de alto valor (${ctx.proposal_amount_mxn} MXN). Se escala a una persona responsable para el siguiente paso.`
+            : `${said} Dar seguimiento breve para acordar el siguiente paso, sin asumir que la compra está decidida.${r4Note}`,
           evidence: [pendingMsg.event_id, openedId],
           confidence: conf,
           confidence_reason: confReason,
@@ -298,13 +310,13 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         return {
           action: 'request_information',
           timing: 'within_24h',
-          reason: `${said} No deja clara su intencion: pedir el dato necesario para avanzar en lugar de suponer.${r4Note}`,
+          reason: `${said} No deja clara su intención: pedir el dato necesario para avanzar en lugar de suponer.${r4Note}`,
           evidence: [pendingMsg.event_id, openedId],
           confidence: 'low',
           confidence_reason: `${confReason} El mensaje es ambiguo, por eso la confianza es baja.`,
           risk_level: 'low',
           requires_human_review: injection,
-          missing: [...pending.missing_information, 'Intencion explicita del cliente'],
+          missing: [...pending.missing_information, 'Intención explícita del cliente'],
         }
     }
   }
@@ -319,20 +331,20 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         action: 'wait',
         timing: 'at_date',
         scheduled_for: iso(retryAt),
-        reason: `Ya se dio seguimiento el ${ctx.last_contact_action.occurred_at.slice(0, 10)} y el cliente no ha respondido${viewsSince.length ? ` (hubo ${viewsSince.length} apertura(s), que no confirman intencion)` : ''}. Insistir antes de ${FOLLOW_UP_GAP_DAYS} dias puede ser contraproducente.`,
+        reason: `Ya se dio seguimiento el ${ctx.last_contact_action.occurred_at.slice(0, 10)} y el cliente no ha respondido${viewsSince.length ? ` (hubo ${viewsSince.length} apertura(s), que no confirman intención)` : ''}. Insistir antes de ${FOLLOW_UP_GAP_DAYS} días puede ser contraproducente. Reevaluar el ${iso(retryAt).slice(0, 16)}Z o antes si el cliente escribe.`,
         evidence: [ctx.last_contact_action.event_id, ...viewsSince.map((v) => v.event_id)],
         confidence: 'medium',
-        confidence_reason: 'Basado en tiempos observados; no hay mensaje del cliente que confirme su interes.',
+        confidence_reason: 'Basado en tiempos observados; no hay mensaje del cliente que confirme su interés.',
         risk_level: 'low',
       }
     }
     return {
       action: 'contact',
       timing: 'within_24h',
-      reason: `Han pasado mas de ${FOLLOW_UP_GAP_DAYS} dias desde el ultimo seguimiento sin respuesta. Un recordatorio breve es razonable, sin afirmar intencion de compra.`,
+      reason: `Han pasado más de ${FOLLOW_UP_GAP_DAYS} días desde el último seguimiento sin respuesta. Un recordatorio breve es razonable, sin afirmar intención de compra.`,
       evidence: [ctx.last_contact_action.event_id, ...viewsSince.map((v) => v.event_id), openedId],
       confidence: 'low',
-      confidence_reason: 'Solo hay silencio y, en su caso, aperturas; ninguna confirma interes.',
+      confidence_reason: 'Solo hay silencio y, en su caso, aperturas; ninguna confirma interés.',
       risk_level: 'low',
     }
   }
@@ -340,7 +352,7 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
   if (ctx.views.length > 0) {
     const lastView = ctx.views[ctx.views.length - 1]
     const m = ctx.metrics
-    const sections = m.sections_viewed.length ? ` (seccion: ${m.sections_viewed.join(', ')})` : ''
+    const sections = m.sections_viewed.length ? ` (sección: ${m.sections_viewed.join(', ')})` : ''
     // Senal debil y reciente: una o dos aperturas en menos de 24h desde el
     // envio. Contactar de inmediato seria leerlas como intencion (R5); se
     // espera 24h desde la ultima apertura o hasta que haya informacion nueva.
@@ -351,10 +363,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         action: 'wait',
         timing: 'at_date',
         scheduled_for: iso(at),
-        reason: `Solo hay ${m.view_count === 1 ? 'una apertura' : 'dos aperturas'}${sections} poco despues del envio. Puede ser interes o solo revision/comparacion; no justifica contacto urgente ni descuentos. Reevaluar el ${iso(at).slice(0, 16)}Z o antes si el cliente escribe.`,
+        reason: `Solo hay ${m.view_count === 1 ? 'una apertura' : 'dos aperturas'}${sections} poco después del envío. Puede ser interés o solo revisión/comparación; no justifica contacto urgente ni descuentos. Reevaluar el ${iso(at).slice(0, 16)}Z o antes si el cliente escribe.`,
         evidence: [...ctx.views.map((v) => v.event_id), openedId],
         confidence: 'medium',
-        confidence_reason: 'Las aperturas son hechos observados, pero no revelan intencion; esperar tiene poco costo porque la propuesta se envio hace menos de 24h.',
+        confidence_reason: 'Las aperturas son hechos observados, pero no revelan intención; esperar tiene poco costo porque la propuesta se envió hace menos de 24h.',
         risk_level: 'low',
       }
     }
@@ -362,10 +374,10 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
     return {
       action: 'contact',
       timing: 'within_24h',
-      reason: `La propuesta se abrio ${m.view_count} ${m.view_count === 1 ? 'vez' : 'veces'}${sections} (ultima ${lastView.occurred_at.slice(0, 16)}Z${m.minutes_to_first_view !== null ? `, primera apertura ${m.minutes_to_first_view} min despues del envio` : ''}) y aun no hay seguimiento. ${burst ? 'El patron puede indicar interes o solo curiosidad: ' : ''}un contacto breve es razonable para averiguarlo; las aperturas no confirman intencion ni justifican descuentos o urgencia.`,
+      reason: `La propuesta se abrió ${m.view_count} ${m.view_count === 1 ? 'vez' : 'veces'}${sections} (última ${lastView.occurred_at.slice(0, 16)}Z${m.minutes_to_first_view !== null ? `, primera apertura ${m.minutes_to_first_view} min después del envío` : ''}) y aún no hay seguimiento. ${burst ? 'El patrón puede indicar interés o solo curiosidad: ' : ''}un contacto breve es razonable para averiguarlo; las aperturas no confirman intención ni justifican descuentos o urgencia.`,
       evidence: [...ctx.views.map((v) => v.event_id), openedId],
       confidence: 'low',
-      confidence_reason: 'Solo hay aperturas (senal indirecta, R5). No hay mensaje del cliente.',
+      confidence_reason: 'Solo hay aperturas (señal indirecta, R5). No hay mensaje del cliente.',
       risk_level: 'low',
     }
   }
@@ -378,20 +390,20 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
         action: 'wait',
         timing: 'at_date',
         scheduled_for: iso(nudgeAt),
-        reason: `La propuesta se envio hace poco y no hay senales del cliente. Reevaluar el ${iso(nudgeAt).slice(0, 10)} o antes si hay aperturas o mensajes.`,
+        reason: `La propuesta se envió hace poco y no hay señales del cliente. Reevaluar el ${iso(nudgeAt).slice(0, 10)} o antes si hay aperturas o mensajes.`,
         evidence: [openedId],
         confidence: 'medium',
-        confidence_reason: 'Sin senales del cliente; la decision se basa solo en el tiempo transcurrido.',
+        confidence_reason: 'Sin señales del cliente; la decisión se basa solo en el tiempo transcurrido.',
         risk_level: 'low',
       }
     }
     return {
       action: 'contact',
       timing: 'within_24h',
-      reason: `La propuesta lleva mas de ${FOLLOW_UP_GAP_DAYS} dias sin aperturas ni respuesta. Un recordatorio breve puede confirmar que la recibio.`,
+      reason: `La propuesta lleva más de ${FOLLOW_UP_GAP_DAYS} días sin aperturas ni respuesta. Un recordatorio breve puede confirmar que la recibió.`,
       evidence: [openedId],
       confidence: 'low',
-      confidence_reason: 'No hay ninguna senal del cliente; podria no haber visto la propuesta.',
+      confidence_reason: 'No hay ninguna señal del cliente; podría no haber visto la propuesta.',
       risk_level: 'low',
     }
   }
@@ -399,7 +411,7 @@ function decideDraft(ctx: CaseContext, interps: Map<string, MessageInterpretatio
   return {
     action: 'wait',
     timing: 'on_new_information',
-    reason: 'No hay informacion suficiente sobre el caso (falta case.opened). Esperar nuevos eventos.',
+    reason: 'No hay información suficiente sobre el caso (falta case.opened). Reevaluar cuando llegue el case.opened o un mensaje nuevo.',
     evidence: ctx.events.slice(-1).map((e) => e.event_id),
     confidence: 'low',
     confidence_reason: 'Historial incompleto.',
@@ -425,7 +437,7 @@ export function safeFallback(ctx: CaseContext, gate: ActionGate, why: string): R
     action: 'wait',
     timing: at ? 'at_date' : 'on_new_information',
     scheduled_for: at,
-    reason: `Se descarto la propuesta original por una regla (${why}). Esperar ${at ? `hasta ${at}` : 'nueva informacion'} y revisar manualmente.`,
+    reason: `Se descartó la propuesta original por una regla (${why}). Esperar ${at ? `hasta ${at}` : 'nueva información'} y revisar manualmente.`,
     evidence_event_ids: evidence,
     confidence: 'low',
     confidence_reason: 'Recomendacion de resguardo tras una validacion fallida.',

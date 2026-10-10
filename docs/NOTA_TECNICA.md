@@ -26,7 +26,10 @@ en español con la misma salida. Las interpretaciones se cachean por
 ultimo contacto, mensajes posteriores al contacto) y metricas entre acciones
 (aperturas, minutos a la primera apertura, aperturas en 24h, horas a la
 primera respuesta, horas desde el ultimo contacto). Se separan explicitamente
-hechos (`facts`), inferencias (`inferences`) e informacion faltante.
+hechos (`facts`), inferencias (`inferences`) e informacion faltante, y la
+pantalla de detalle los muestra en tres columnas (`lib/agent/analysis.ts`).
+Eventos con fecha posterior a la hora de evaluacion se ignoran y la razon lo
+dice; un monto no positivo se declara como informacion faltante.
 
 **Reglas.** R1 cerrado → solo `no_action`. R2 `contact_allowed=false` y R3
 antes de `contact_not_before` bloquean `contact`, `request_information` y

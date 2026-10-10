@@ -31,12 +31,13 @@ interface CaseDetail {
   current: DecisionRecord | null
   previous: DecisionRecord | null
   diff: { field: string; before: unknown; after: unknown }[]
+  analysis: { facts: string[]; inferences: string[]; missing: string[] }
 }
 
 const ACTION_LABEL: Record<string, string> = {
   contact: 'Contactar',
-  request_information: 'Pedir informacion',
-  resolve_objection: 'Resolver objecion',
+  request_information: 'Pedir información',
+  resolve_objection: 'Resolver objeción',
   escalate: 'Escalar a una persona',
   wait: 'Esperar',
   no_action: 'No actuar',
@@ -126,7 +127,7 @@ export function Dashboard() {
         <div>
           <h1>Git Happens · What Should Happen Next?</h1>
           <div className="sub">
-            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.provider === 'gemini' ? 'Gemini (live)' : data?.provider === 'claude' ? 'Claude (live)' : 'heuristica (fallback)'}</span> <span className="mode-pill" title={data?.storage.lastError ?? ''}>BD: {data?.storage.backend ?? '—'}{data?.storage.lastError ? ' (error)' : ''}</span>
+            Hora de evaluación: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.provider === 'gemini' ? 'Gemini (live)' : data?.provider === 'claude' ? 'Claude (live)' : 'heuristica (fallback)'}</span> <span className="mode-pill" title={data?.storage.lastError ?? ''}>BD: {data?.storage.backend ?? '—'}{data?.storage.lastError ? ' (error)' : ''}</span>
           </div>
         </div>
         <div className="toolbar">
@@ -194,7 +195,7 @@ export function Dashboard() {
             </button>
             <label>Cargar archivos (events.jsonl y manifest.json)</label>
             <input type="file" multiple accept=".jsonl,.json,.txt" onChange={(e) => onFiles(e.target.files)} />
-            <label>O pega lineas JSONL</label>
+            <label>O pega líneas JSONL</label>
             <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder='{"event_id":"...","case_id":"...", ...}' />
             <button className="btn" disabled={busy || !paste.trim()} onClick={() => post('/api/events', { jsonl: paste }, ingestMsg).then(() => setPaste(''))}>
               Agregar eventos
@@ -227,7 +228,7 @@ export function Dashboard() {
                     <span className={`badge ${rec.action}`}>{rec.action}</span>
                     <span className={`badge level-${rec.confidence}`}>confianza {rec.confidence}</span>
                     <span className={`badge level-${rec.risk_level}`}>riesgo {rec.risk_level}</span>
-                    {rec.requires_human_review && <span className="badge escalate">requiere revision humana</span>}
+                    {rec.requires_human_review && <span className="badge escalate">requiere revisión humana</span>}
                   </div>
                   <p className="rec-reason">{rec.reason}</p>
                   <div className="kv">
@@ -249,18 +250,22 @@ export function Dashboard() {
                     </div>
                   </div>
                   <p className="muted">
-                    <b>Por que esta confianza:</b> {rec.confidence_reason}
+                    <b>Por qué esta confianza:</b> {rec.confidence_reason}
                   </p>
-                  {rec.missing_information.length > 0 && (
+                  <div className="analysis">
                     <div>
-                      <b style={{ fontSize: 13 }}>Informacion faltante</b>
-                      <ul className="muted" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-                        {rec.missing_information.map((m) => (
-                          <li key={m}>{m}</li>
-                        ))}
-                      </ul>
+                      <b>Hechos observados</b>
+                      <ul>{detail.analysis.facts.length ? detail.analysis.facts.map((f) => <li key={f}>{f}</li>) : <li>—</li>}</ul>
                     </div>
-                  )}
+                    <div>
+                      <b>Inferencias</b>
+                      <ul>{detail.analysis.inferences.length ? detail.analysis.inferences.map((f) => <li key={f}>{f}</li>) : <li>Sin mensajes que interpretar.</li>}</ul>
+                    </div>
+                    <div>
+                      <b>Información faltante</b>
+                      <ul>{detail.analysis.missing.length ? detail.analysis.missing.map((f) => <li key={f}>{f}</li>) : <li>Nada esencial.</li>}</ul>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="panel empty">Caso sin evaluar. Presiona “Evaluar”.</div>
@@ -268,7 +273,7 @@ export function Dashboard() {
 
               {detail.diff.length > 0 && (
                 <div className="panel section">
-                  <h3>Que cambio respecto a la decision anterior</h3>
+                  <h3>Qué cambió respecto a la decisión anterior</h3>
                   <ul className="diff">
                     {detail.diff.map((d) => (
                       <li key={d.field}>
@@ -282,7 +287,7 @@ export function Dashboard() {
 
               {detail.current && (
                 <div className="panel section">
-                  <h3>Validacion deterministica de reglas</h3>
+                  <h3>Validación determinística de reglas</h3>
                   <ul className="rules">
                     {detail.current.rule_checks.map((c) => (
                       <li key={c.rule}>
@@ -298,7 +303,7 @@ export function Dashboard() {
               )}
 
               <div className="panel section">
-                <h3>Metricas entre acciones</h3>
+                <h3>Métricas entre acciones</h3>
                 <div className="kv">
                   <div><span>Aperturas</span><strong>{detail.metrics.view_count}</strong></div>
                   <div><span>Min. a 1a apertura</span><strong>{detail.metrics.minutes_to_first_view ?? '—'}</strong></div>
