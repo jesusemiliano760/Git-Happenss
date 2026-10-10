@@ -148,7 +148,7 @@ export function Dashboard() {
           <a className="btn" href="/api/export" download>
             Exportar JSON
           </a>
-          <button className="btn" disabled={busy} onClick={() => post('/api/reset', {}, () => 'Datos borrados.').then(() => setSelected(null))}>
+          <button className="btn" disabled={busy} onClick={() => post('/api/reset', {}, (r) => `${r.archivedAs ? 'Copia guardada en el historial de Supabase. ' : ''}Datos borrados y kit oficial cargado (${r.evaluatedCaseIds.length} casos).`).then(() => setSelected(null))}>
             Reiniciar
           </button>
         </div>
