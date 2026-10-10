@@ -14,17 +14,28 @@ export function resolveEvaluationTime(store: CaseStore): string {
 export async function evaluateCases(store: CaseStore, caseIds = store.caseIds()): Promise<Record<string, DecisionRecord>> {
   const now = resolveEvaluationTime(store)
   const out: Record<string, DecisionRecord> = {}
-  for (const id of caseIds) {
-    try {
-      const record = await evaluateCase(id, store.events(id), now)
-      store.recordDecision(id, record)
-      out[id] = record
-    } catch (error) {
-      // Un caso que falla no detiene a los demas.
-      console.error(`[agent] error evaluando ${id}:`, error)
+  // Los casos se evaluan en paralelo (hasta 4 a la vez) para no esperar las
+  // llamadas a la IA una por una.
+  const queue = [...caseIds]
+  const worker = async () => {
+    for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+      try {
+        out[id] = await evaluateCase(id, store.events(id), now)
+      } catch (error) {
+        // Un caso que falla no detiene a los demas.
+        console.error(`[agent] error evaluando ${id}:`, error)
+      }
     }
   }
-  return out
+  await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker))
+  // Se registran en el orden original para que el resultado sea repetible.
+  const ordered: Record<string, DecisionRecord> = {}
+  for (const id of caseIds) {
+    if (!out[id]) continue
+    store.recordDecision(id, out[id])
+    ordered[id] = out[id]
+  }
+  return ordered
 }
 
 export function exportDecisions(store: CaseStore) {

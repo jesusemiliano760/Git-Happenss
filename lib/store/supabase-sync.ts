@@ -80,7 +80,7 @@ export async function loadStoreFromSupabase(interpCache: Map<string, MessageInte
       selectAll<{ event_id: string; interpretation: MessageInterpretation }>('interpretations', 'created_at'),
       selectAll<DecisionRow>('decisions', 'created_at'),
       selectAll<EventValidationError>('ingest_errors', 'id'),
-      selectAll<{ key: string; value: unknown }>('app_state', 'key'),
+      check(await db().from('app_state').select('key, value').eq('key', 'evaluation_at')) as { key: string; value: unknown }[],
     ])
     const store = new CaseStore()
     // Postgres regresa "2026-10-09T15:00:00+00:00"; se normaliza al formato del kit.
@@ -194,7 +194,33 @@ export async function persistDecisions(records: Record<string, DecisionRecord>) 
   await safe('decisions', async () => check(await db().from('decisions').insert(rows)))
 }
 
-// Boton "Reiniciar": borra todo (en orden por la llave foranea).
+// Copias guardadas por el boton "Reiniciar" en app_state, con llave
+// "historial:<fecha>". Reiniciar no las borra.
+export const ARCHIVE_PREFIX = 'historial:'
+
+// Guarda en app_state una copia de todo lo que hay (eventos, interpretaciones,
+// decisiones y errores) antes de borrar. Regresa la llave, o null si no habia
+// nada que guardar o Supabase fallo.
+export async function archiveSupabase(): Promise<string | null> {
+  return safe('historial', async () => {
+    const [events, interpretations, decisions, errors, state] = await Promise.all([
+      selectAll<CaseEvent>('events', 'occurred_at'),
+      selectAll<Record<string, unknown>>('interpretations', 'created_at'),
+      selectAll<Record<string, unknown>>('decisions', 'created_at'),
+      selectAll<Record<string, unknown>>('ingest_errors', 'id'),
+      check(await db().from('app_state').select('value').eq('key', 'evaluation_at')) as { value: unknown }[],
+    ])
+    if (!events.length && !decisions.length && !errors.length) return null
+    const savedAt = new Date().toISOString()
+    const key = ARCHIVE_PREFIX + savedAt
+    const value = { saved_at: savedAt, evaluation_at: state[0]?.value ?? null, events, interpretations, decisions, errors }
+    check(await db().from('app_state').insert({ key, value }))
+    return key
+  })
+}
+
+// Boton "Reiniciar": borra todo (en orden por la llave foranea), menos las
+// copias del historial.
 export async function clearSupabase() {
   await safe('reset', async () => {
     for (const [table, col] of [
@@ -202,10 +228,10 @@ export async function clearSupabase() {
       ['decisions', 'case_id'],
       ['ingest_errors', 'line'],
       ['events', 'event_id'],
-      ['app_state', 'key'],
     ] as const) {
       check(await db().from(table).delete().not(col, 'is', null))
     }
+    check(await db().from('app_state').delete().not('key', 'like', `${ARCHIVE_PREFIX}%`))
     persistedInterps.clear()
   })
 }
