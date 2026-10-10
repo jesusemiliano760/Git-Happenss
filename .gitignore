@@ -1,0 +1,11 @@
+# Environment variables (nunca subir llaves)
+.env
+.env*.local
+
+node_modules
+.next/
+.DS_Store
+*.tsbuildinfo
+
+# Salidas regenerables (la entrega final se copia a output/ a mano)
+output/*.tmp.json

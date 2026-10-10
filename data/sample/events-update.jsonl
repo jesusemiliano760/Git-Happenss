@@ -1,0 +1,3 @@
+{"event_id":"ev-043","case_id":"DEMO-005","event_type":"message.received","occurred_at":"2026-10-10T16:30:00Z","data":{"message":"Hola, gracias por escribir. Pueden explicarme como funciona la garantia?"}}
+{"event_id":"ev-073","case_id":"DEMO-008","event_type":"constraint.updated","occurred_at":"2026-10-10T17:00:00Z","data":{"contact_allowed":false}}
+{"event_id":"ev-042","case_id":"DEMO-005","event_type":"action.executed","occurred_at":"2026-10-10T13:00:00Z","data":{"action":"contact"}}
