@@ -16,10 +16,10 @@ export function parseEventLine(raw: string, line: number): CaseEvent | EventVali
   try {
     obj = JSON.parse(raw)
   } catch (e) {
-    return { line, error: `JSON invalido: ${(e as Error).message}`, raw }
+    return { line, error: `JSON inválido: ${(e as Error).message}`, raw }
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
-    return { line, error: 'La linea no es un objeto JSON', raw }
+    return { line, error: 'La línea no es un objeto JSON', raw }
   }
   const o = obj as Record<string, unknown>
   const base = {
@@ -28,10 +28,10 @@ export function parseEventLine(raw: string, line: number): CaseEvent | EventVali
     event_id: typeof o.event_id === 'string' ? o.event_id : undefined,
     case_id: typeof o.case_id === 'string' ? o.case_id : undefined,
   }
-  if (typeof o.event_id !== 'string' || !o.event_id.trim()) return { ...base, error: 'event_id faltante o vacio' }
-  if (typeof o.case_id !== 'string' || !o.case_id.trim()) return { ...base, error: 'case_id faltante o vacio' }
+  if (typeof o.event_id !== 'string' || !o.event_id.trim()) return { ...base, error: 'event_id faltante o vacío' }
+  if (typeof o.case_id !== 'string' || !o.case_id.trim()) return { ...base, error: 'case_id faltante o vacío' }
   if (typeof o.event_type !== 'string' || !EVENT_TYPE_SET.has(o.event_type)) {
-    return { ...base, error: `event_type invalido: ${JSON.stringify(o.event_type)}` }
+    return { ...base, error: `event_type inválido: ${JSON.stringify(o.event_type)}` }
   }
   if (!isIsoDate(o.occurred_at)) return { ...base, error: `occurred_at no es ISO 8601: ${JSON.stringify(o.occurred_at)}` }
   const data = o.data ?? {}
@@ -69,7 +69,7 @@ function validateEventData(ev: CaseEvent): string | null {
       return null
     case 'case.opened':
       if (d.proposal_amount_mxn !== undefined && typeof d.proposal_amount_mxn !== 'number') {
-        return 'proposal_amount_mxn debe ser numero'
+        return 'proposal_amount_mxn debe ser número'
       }
       return null
     default:

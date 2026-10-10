@@ -52,7 +52,7 @@ export function allowedActions(ctx: CaseContext): ActionGate {
 
   // R4 24h tras contact/request_information, salvo nuevo message.received.
   if (ctx.cooldown_until) {
-    for (const a of CONTACT_ACTIONS) block(gate, a, `R4: ultimo contacto hace <24h (libre a partir de ${ctx.cooldown_until})`)
+    for (const a of CONTACT_ACTIONS) block(gate, a, `R4: último contacto hace <24h (libre a partir de ${ctx.cooldown_until})`)
     if (!gate.earliestContact || Date.parse(ctx.cooldown_until) > Date.parse(gate.earliestContact)) {
       gate.earliestContact = ctx.cooldown_until
     }
@@ -73,10 +73,10 @@ export function validateRecommendation(rec: Recommendation, ctx: CaseContext): R
   // --- Contrato (seccion 6) ---
   const contractErrors: string[] = []
   if (rec.case_id !== ctx.case_id) contractErrors.push('case_id no coincide')
-  if (!ACTIONS.includes(rec.action)) contractErrors.push(`action invalida: ${rec.action}`)
-  if (!TIMINGS.includes(rec.timing)) contractErrors.push(`timing invalido: ${rec.timing}`)
-  if (!LEVELS.includes(rec.confidence)) contractErrors.push('confidence invalida')
-  if (!LEVELS.includes(rec.risk_level)) contractErrors.push('risk_level invalido')
+  if (!ACTIONS.includes(rec.action)) contractErrors.push(`action inválida: ${rec.action}`)
+  if (!TIMINGS.includes(rec.timing)) contractErrors.push(`timing inválido: ${rec.timing}`)
+  if (!LEVELS.includes(rec.confidence)) contractErrors.push('confidence inválida')
+  if (!LEVELS.includes(rec.risk_level)) contractErrors.push('risk_level inválido')
   if (rec.timing === 'at_date' && !isIsoDate(rec.scheduled_for)) contractErrors.push('at_date requiere scheduled_for ISO')
   if (rec.timing !== 'at_date' && rec.scheduled_for !== null) contractErrors.push('scheduled_for debe ser null si timing != at_date')
   if (rec.action === 'wait' && !['at_date', 'on_new_information'].includes(rec.timing)) contractErrors.push('wait debe usar at_date u on_new_information')
@@ -89,7 +89,7 @@ export function validateRecommendation(rec: Recommendation, ctx: CaseContext): R
   if (rec.evidence_event_ids.length === 0) contractErrors.push('sin evidencia')
   const foreign = rec.evidence_event_ids.filter((id) => !caseEventIds.has(id))
   if (foreign.length) contractErrors.push(`evidencia inexistente en el caso: ${foreign.join(', ')}`)
-  checks.push({ rule: 'CONTRACT', passed: contractErrors.length === 0, detail: contractErrors.join('; ') || 'Cumple el contrato de recomendacion' })
+  checks.push({ rule: 'CONTRACT', passed: contractErrors.length === 0, detail: contractErrors.join('; ') || 'Cumple el contrato de recomendación' })
 
   // --- R1 ---
   checks.push({
@@ -135,18 +135,18 @@ export function validateRecommendation(rec: Recommendation, ctx: CaseContext): R
     rule: 'R5',
     passed: !r5Text && !r5Urgency,
     detail: r5Text
-      ? 'La explicacion presenta aperturas como intencion o sugiere descuento/cierre'
+      ? 'La explicación presenta aperturas como intención o sugiere descuento/cierre'
       : r5Urgency
         ? 'Solo hay aperturas: no justifican urgencia inmediata con confianza alta'
-        : 'No se usan aperturas como intencion confirmada',
+        : 'No se usan aperturas como intención confirmada',
   })
 
   // --- R6 --- reconocer informacion faltante
-  const needsMissing = !ctx.opened || ctx.proposal_amount_mxn === null || ctx.messages.length === 0
+  const needsMissing = !ctx.opened || ctx.proposal_amount_mxn === null || !(ctx.proposal_amount_mxn > 0) || ctx.messages.length === 0
   checks.push({
     rule: 'R6',
     passed: !needsMissing || rec.missing_information.length > 0 || Boolean(ctx.closed),
-    detail: needsMissing ? 'Hay informacion esencial faltante que debe declararse' : 'Informacion esencial disponible',
+    detail: needsMissing ? 'Hay información esencial faltante que debe declararse' : 'Información esencial disponible',
   })
 
   return checks

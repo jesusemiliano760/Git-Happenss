@@ -48,7 +48,7 @@ export async function evaluateCase(caseId: string, events: CaseEvent[], now: str
       'interpret_message',
       `${msg.event_id} -> ${interp.intent} (${interp.confidence}, ${interp.source})` +
         (interp.requested_contact_after ? ` pide esperar hasta ${interp.requested_contact_after}` : '') +
-        (interp.injection_suspected ? ' [texto con forma de instruccion: tratado como dato]' : ''),
+        (interp.injection_suspected ? ' [texto con forma de instrucción: tratado como dato]' : ''),
     )
   }
 

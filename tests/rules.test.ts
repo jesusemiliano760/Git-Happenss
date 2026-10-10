@@ -159,3 +159,38 @@ test('Caso cerrado y reabierto: la razon muestra el status del cierre', async ()
   assert.equal(rec.action, 'no_action')
   assert.match(rec.reason, /status=lost/)
 })
+
+test('R2: cliente bloqueado que pide "llamenme para cerrar" -> escalar, sin contacto', async () => {
+  const rec = await decideFor([
+    opened('BL'),
+    ev('BL', 'constraint.updated', '2026-10-07T10:00:00Z', { contact_allowed: false }),
+    ev('BL', 'message.received', '2026-10-09T10:00:00Z', { message: 'Ya lo pensé mejor, por favor llámenme hoy para cerrar.' }),
+  ])
+  assert.equal(rec.action, 'escalate')
+  assert.equal(rec.requires_human_review, true)
+})
+
+test('wait siempre dice cuando reevaluar (seguimiento sin respuesta)', async () => {
+  const rec = await decideFor([
+    opened('FU'),
+    ev('FU', 'action.executed', '2026-10-09T12:00:00Z', { action: 'contact' }),
+  ])
+  assert.equal(rec.action, 'wait')
+  assert.match(rec.reason, /Reevaluar/)
+})
+
+test('Monto negativo -> se declara como informacion faltante', async () => {
+  const rec = await decideFor([
+    ev('NG', 'case.opened', '2026-10-05T10:00:00Z', { status: 'open', proposal_amount_mxn: -5000 }),
+    ev('NG', 'message.received', '2026-10-09T10:00:00Z', { message: '¿Incluye garantía?' }),
+  ])
+  assert.ok(rec.missing_information.some((m) => /-5000/.test(m)))
+})
+
+test('Evento con fecha posterior a la evaluacion -> se ignora y se menciona', async () => {
+  const rec = await decideFor([
+    opened('FT'),
+    ev('FT', 'message.received', '2026-10-20T10:00:00Z', { message: '¿Tienen planes de pago?' }),
+  ])
+  assert.match(rec.reason, /posterior a la hora de evaluaci/)
+})

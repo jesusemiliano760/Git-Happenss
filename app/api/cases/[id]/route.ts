@@ -3,6 +3,8 @@ import { getStore } from '@/lib/store/server'
 import { diffDecisions } from '@/lib/agent/agent'
 import { buildContext } from '@/lib/agent/context'
 import { resolveEvaluationTime } from '@/lib/agent/run'
+import { buildAnalysis } from '@/lib/agent/analysis'
+import { interpCache } from '@/lib/agent/agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     case_id: id,
     events,
     metrics: ctx.metrics,
+    analysis: buildAnalysis(ctx, interpCache, current?.recommendation ?? null),
     current,
     previous,
     diff: current ? diffDecisions(previous?.recommendation ?? null, current.recommendation) : [],
