@@ -15,9 +15,9 @@ Requisitos: Node 20+.
 
 ```bash
 npm install
-cp .env.example .env.local      # pon tu GEMINI_API_KEY ahi
-npm run check:ia                # verifica que la llave de Gemini funcione
-npm run dev                     # http://localhost:3000
+cp .env.example .env.local      
+npm run check:ia                
+npm run dev                     
 ```
 
 En la UI: **Cargar kit oficial** → revisa los casos → **+ updates.jsonl**
