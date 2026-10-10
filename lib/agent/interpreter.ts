@@ -16,6 +16,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import * as z from 'zod/v4'
 import type { CaseEvent } from '@/lib/events/types'
 import type { Level } from '@/lib/decisions/types'
+import { toIso } from './context'
 
 export const INTENTS = [
   'interested', // interes explicito en avanzar
@@ -50,7 +51,7 @@ const RE = {
   injection: /(ignora|olvida|omite)\s+(las|tus|todas)?\s*(reglas|instrucciones)|system prompt|act[uú]a como|eres un (modelo|asistente)|nueva instrucci[oó]n/i,
   noContact: /no\s+(me|nos)\s+(vuelvan a\s+)?(contacten|llamen|escriban|busquen)|dejen de (contactar|escribir|llamar)|b[aá]j(a|enme)\s+de|no quiero (que me contacten|m[aá]s mensajes)/i,
   notInterested: /no (nos|me) interesa|ya no (nos|me) interesa|decidimos no|elegimos (a )?otro|otro proveedor|no vamos a (seguir|continuar|contratar)|cancel(ar|amos)|descartamos/i,
-  wait: /(despu[eé]s|hasta|dentro de|en)\s+(de\s+)?(\d+|un|una|dos|tres|cuatro|un par de)\s+(d[ií]as?|semanas?|mes(es)?)|pr[oó]xima semana|pr[oó]ximo mes|m[aá]s adelante|regres(o|ando) de|vacaciones|no antes del?|esper(en|ar) (a|hasta)|a partir del?/i,
+  wait: /(despu[eé]s|hasta|dentro de|en)\s+(de\s+)?(\d+|un|una|dos|tres|cuatro|un par de)\s+(d[ií]as?|semanas?|mes(es)?)|pr[oó]xima semana|pr[oó]ximo mes|m[aá]s adelante|regres(o|ando) de|vacaciones|antes del?\s+(\d|lunes|martes|mi[eé]rcoles|jueves|viernes|pr[oó]xim)|hasta (el|la)\s+\S+|esper(en|ar) (a|hasta)|a partir del?/i,
   objection: /caro|precio|costo|cuesta|presupuesto|descuento|no (estoy|estamos) seguros?|me preocupa|nos preocupa|competencia|garant[ií]a|plazo|tiempo de entrega|condiciones|no (me|nos) convence|objeci[oó]n/i,
   question: /\?|podr[ií]an (enviar|mandar|explicar|decir)|necesito saber|quisiera saber|me pueden|informaci[oó]n|detalles|ficha t[eé]cnica|c[oó]mo funciona/i,
   interested: /me interesa|nos interesa|avancemos|adelante con|queremos (contratar|comprar|avanzar)|aprobad[oa]|listo para firmar|c[uú]ando (podemos|empezamos)|me gust[oó] la propuesta/i,
@@ -72,19 +73,23 @@ export function inferRequestedDate(text: string, sentAt: string): string | null 
 
   const explicit = t.match(/(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)/)
   if (explicit) {
+    // Hora opcional "a las 15:00" (el kit esta en UTC).
+    const time = t.match(/a las?\s+(\d{1,2})(?::(\d{2}))?/)
+    const hh = time ? Number(time[1]) : 0
+    const mm = time?.[2] ? Number(time[2]) : 0
     const year = new Date(base).getUTCFullYear()
-    let d = Date.UTC(year, MONTHS[explicit[2]], Number(explicit[1]))
-    if (d < base) d = Date.UTC(year + 1, MONTHS[explicit[2]], Number(explicit[1]))
-    return new Date(d).toISOString()
+    let d = Date.UTC(year, MONTHS[explicit[2]], Number(explicit[1]), hh, mm)
+    if (d < base) d = Date.UTC(year + 1, MONTHS[explicit[2]], Number(explicit[1]), hh, mm)
+    return toIso(d)
   }
   const rel = t.match(/(\d+|un par de|una|un|dos|tres|cuatro)\s+(d[ií]as?|semanas?|mes(es)?)/)
   if (rel) {
     const n = /^\d+$/.test(rel[1]) ? Number(rel[1]) : NUM[rel[1]] ?? 1
     const unit = rel[2].startsWith('d') ? 1 : rel[2].startsWith('s') ? 7 : 30
-    return new Date(base + n * unit * DAY).toISOString()
+    return toIso(base + n * unit * DAY)
   }
-  if (/pr[oó]xima semana/.test(t)) return new Date(base + 7 * DAY).toISOString()
-  if (/pr[oó]ximo mes/.test(t)) return new Date(base + 30 * DAY).toISOString()
+  if (/pr[oó]xima semana/.test(t)) return toIso(base + 7 * DAY)
+  if (/pr[oó]ximo mes/.test(t)) return toIso(base + 30 * DAY)
   return null
 }
 
@@ -99,7 +104,9 @@ export function interpretHeuristic(ev: CaseEvent): MessageInterpretation {
   let confidence: Level = 'low'
 
   const injection = RE.injection.test(text)
-  const asksNoContact = RE.noContact.test(text)
+  // "No me contacten antes del 12" es una pausa con fecha, no un rechazo al
+  // contacto: solo cuenta como opt-out si no hay limite temporal.
+  const asksNoContact = RE.noContact.test(text) && !RE.wait.test(text)
 
   if (asksNoContact || RE.notInterested.test(text)) {
     intent = 'not_interested'
@@ -177,7 +184,7 @@ Campos:
 - intent: interested | objection | requests_information | provides_information | requests_wait | not_interested | ambiguous
 - objection_topic: tema de la objecion (precio, plazo, alcance...) o null.
 - requested_contact_after: si el cliente pide que lo contacten despues, la fecha ISO 8601 UTC calculada a partir de la fecha del mensaje; null si no aplica o no se puede calcular con seguridad.
-- asks_no_contact: true solo si pide explicitamente no ser contactado.
+- asks_no_contact: true solo si pide no ser contactado SIN limite de tiempo. "No me contacten antes del 12 de octubre" NO es asks_no_contact: es requests_wait con requested_contact_after en esa fecha (incluye la hora si la menciona).
 - facts: lo que el mensaje dice literalmente (hechos observados).
 - inferences: lo que interpretas y podria estar equivocado.
 - missing_information: datos que faltan para decidir bien.

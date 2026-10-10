@@ -1,7 +1,7 @@
 // Corre el agente sobre un kit sin levantar la UI y escribe el JSON de
 // recomendaciones (entregable de la seccion 7).
 //
-//   npm run decide                                   -> data/kit si existe, si no data/sample
+//   npm run decide                                   -> data/kit (events + updates) si existe, si no data/sample
 //   npm run decide -- data/kit/events.jsonl data/kit/manifest.json output/decisions.json
 //   npm run decide -- data/sample/events.jsonl data/sample/manifest.json output/x.json data/sample/events-update.jsonl
 
@@ -10,16 +10,19 @@ import path from 'node:path'
 import { CaseStore } from '@/lib/store/memory-store'
 import { evaluateCases, exportDecisions } from '@/lib/agent/run'
 import { diffDecisions } from '@/lib/agent/agent'
+import { manifestEvaluationTime } from '@/lib/events/types'
 
+const args = process.argv.slice(2)
 const kitDir = fs.existsSync('data/kit/events.jsonl') ? 'data/kit' : 'data/sample'
-const [eventsPath = `${kitDir}/events.jsonl`, manifestPath = `${kitDir}/manifest.json`, outPath = 'output/decisions.json', ...updates] =
-  process.argv.slice(2)
+const [eventsPath = `${kitDir}/events.jsonl`, manifestPath = `${kitDir}/manifest.json`, outPath = 'output/decisions.json', ...extra] = args
+// Sin argumentos y con el kit oficial: tambien se aplica updates.jsonl.
+const updates = args.length === 0 && fs.existsSync(`${kitDir}/updates.jsonl`) ? [`${kitDir}/updates.jsonl`] : extra
 
 async function main() {
   const store = new CaseStore()
   if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-    store.evaluationTime = manifest.evaluation_time ?? manifest.evaluated_at ?? manifest.now ?? null
+    store.evaluationTime = manifestEvaluationTime(manifest)
   }
   const res = store.ingestJsonl(fs.readFileSync(eventsPath, 'utf8'))
   console.log(`Eventos: ${res.accepted.length} aceptados, ${res.duplicates.length} duplicados, ${res.errors.length} con error`)
@@ -28,6 +31,13 @@ async function main() {
 
   const first = await evaluateCases(store)
   printTable(first)
+  fs.mkdirSync(path.dirname(outPath), { recursive: true })
+  if (updates.length) {
+    // Foto antes de las actualizaciones, para la demo de "que cambio".
+    const initialPath = outPath.replace(/\.json$/, '-inicial.json')
+    fs.writeFileSync(initialPath, JSON.stringify(exportDecisions(store), null, 2) + '\n')
+    console.log(`Escrito ${initialPath}`)
+  }
 
   for (const upd of updates) {
     const r = store.ingestJsonl(fs.readFileSync(upd, 'utf8'))
@@ -40,7 +50,6 @@ async function main() {
     }
   }
 
-  fs.mkdirSync(path.dirname(outPath), { recursive: true })
   fs.writeFileSync(outPath, JSON.stringify(exportDecisions(store), null, 2) + '\n')
   console.log(`\nEscrito ${outPath}`)
 }

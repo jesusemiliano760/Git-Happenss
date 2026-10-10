@@ -39,7 +39,18 @@ export interface IngestResult {
 
 // Manifest del kit: la hora de evaluacion viene de aqui, NO del reloj real,
 // para que las pruebas sean repetibles (seccion 4 del PDF).
+// El kit oficial usa `evaluation_at`; se aceptan otros nombres por si las
+// variantes del jurado cambian.
 export interface Manifest {
-  evaluation_time: string
+  evaluation_at?: string
   [key: string]: unknown
+}
+
+export function manifestEvaluationTime(manifest: unknown): string | null {
+  if (!manifest || typeof manifest !== 'object') return null
+  const m = manifest as Record<string, unknown>
+  for (const key of ['evaluation_at', 'evaluation_time', 'evaluated_at', 'now']) {
+    if (typeof m[key] === 'string') return m[key] as string
+  }
+  return null
 }

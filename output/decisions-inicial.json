@@ -1,0 +1,100 @@
+[
+  {
+    "case_id": "P01",
+    "action": "resolve_objection",
+    "timing": "immediate",
+    "scheduled_for": null,
+    "reason": "El cliente escribio \"¿La propuesta incluye instalación?\". Es una duda explicita: conviene aclararla sin ofrecer descuentos ni presionar el cierre.",
+    "evidence_event_ids": [
+      "P01-e2",
+      "P01-e1"
+    ],
+    "confidence": "medium",
+    "confidence_reason": "Basado en la interpretacion (heuristic) del mensaje P01-e2. El cliente hace una pregunta o pide informacion.",
+    "risk_level": "medium",
+    "requires_human_review": false,
+    "missing_information": []
+  },
+  {
+    "case_id": "P02",
+    "action": "wait",
+    "timing": "at_date",
+    "scheduled_for": "2026-10-10T15:00:00Z",
+    "reason": "Solo hay una apertura (seccion: price) poco despues del envio. Puede ser interes o solo revision/comparacion; no justifica contacto urgente ni descuentos. Reevaluar el 2026-10-10T15:00Z o antes si el cliente escribe.",
+    "evidence_event_ids": [
+      "P02-e2",
+      "P02-e1"
+    ],
+    "confidence": "medium",
+    "confidence_reason": "Las aperturas son hechos observados, pero no revelan intencion; esperar tiene poco costo porque la propuesta se envio hace menos de 24h.",
+    "risk_level": "low",
+    "requires_human_review": false,
+    "missing_information": [
+      "Respuesta explicita del cliente: solo hay senales indirectas (aperturas)"
+    ]
+  },
+  {
+    "case_id": "P03",
+    "action": "wait",
+    "timing": "at_date",
+    "scheduled_for": "2026-10-12T15:00:00Z",
+    "reason": "El cliente pidio no ser contactado antes de 2026-10-12T15:00Z y existe la restriccion contact_not_before correspondiente. Esperar y reevaluar en esa fecha, o antes si llega un mensaje nuevo.",
+    "evidence_event_ids": [
+      "P03-e2",
+      "P03-e3"
+    ],
+    "confidence": "high",
+    "confidence_reason": "La solicitud temporal explicita del cliente y la restriccion estructurada (contact_not_before) coinciden; no conocemos su intencion de compra.",
+    "risk_level": "low",
+    "requires_human_review": false,
+    "missing_information": []
+  },
+  {
+    "case_id": "P04",
+    "action": "escalate",
+    "timing": "immediate",
+    "scheduled_for": null,
+    "reason": "El cliente expreso interes (\"Me interesa conocer más.\"), pero contact_allowed=false prohibe contactarlo. Se escala a revision interna; no se redacta ni envia ningun mensaje al cliente.",
+    "evidence_event_ids": [
+      "P04-e2",
+      "P04-e3"
+    ],
+    "confidence": "high",
+    "confidence_reason": "La restriccion es un hecho observado (constraint.updated) y hay un mensaje del cliente pendiente.",
+    "risk_level": "high",
+    "requires_human_review": true,
+    "missing_information": []
+  },
+  {
+    "case_id": "P05",
+    "action": "no_action",
+    "timing": "not_applicable",
+    "scheduled_for": null,
+    "reason": "El caso se cerro (status=accepted) en 2026-10-09T15:00:00Z. Un cierre es definitivo: no hay intervencion valida.",
+    "evidence_event_ids": [
+      "P05-e3"
+    ],
+    "confidence": "high",
+    "confidence_reason": "Hecho observado: existe un evento case.closed. No depende de interpretacion.",
+    "risk_level": "low",
+    "requires_human_review": false,
+    "missing_information": []
+  },
+  {
+    "case_id": "P06",
+    "action": "wait",
+    "timing": "at_date",
+    "scheduled_for": "2026-10-10T14:00:00Z",
+    "reason": "Ya se contacto al cliente hace menos de 24h sin respuesta nueva (R4). Reevaluar a partir de 2026-10-10T14:00:00Z.",
+    "evidence_event_ids": [
+      "P06-e2"
+    ],
+    "confidence": "high",
+    "confidence_reason": "Decision determinada por una regla de tiempo verificable.",
+    "risk_level": "low",
+    "requires_human_review": false,
+    "missing_information": [
+      "Respuesta explicita del cliente: solo hay senales indirectas (aperturas)"
+    ]
+  }
+]

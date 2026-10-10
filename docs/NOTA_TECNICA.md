@@ -6,7 +6,7 @@ un error no detiene a los demas casos) → almacen en memoria agrupado por
 por caso: `buildContext` → interpretacion IA de mensajes → `allowedActions`
 (R1-R4) → `decide` (politica) → `validateRecommendation` (R1-R6 + contrato) →
 publicacion. Cada evaluacion se guarda; la anterior se conserva para mostrar
-el diff. La hora "actual" es `manifest.evaluation_time` (nunca el reloj real),
+el diff. La hora "actual" es `manifest.evaluation_at` (nunca el reloj real),
 y los eventos posteriores a esa hora se ignoran.
 
 **IA utilizada.** Claude (`claude-opus-5-5` por defecto, configurable) via
@@ -46,4 +46,5 @@ escalamientos, montos altos, rechazos y texto con forma de instruccion.
 basada en palabras clave (el modo live es mas robusto). Almacen en memoria (se
 pierde al reiniciar). Sin aprendizaje a partir de resultados aun
 (ver `docs/NOTAS_AUDIO.md`: retroalimentacion y perfiles como siguiente paso).
-El nombre del campo de `action.executed` se confirmara con `contratos.json`.
+Una o dos aperturas en menos de 24h desde el envio se tratan como señal debil
+(se espera 24h); esto es una decision de diseño, no una regla del kit.

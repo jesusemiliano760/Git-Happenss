@@ -37,9 +37,15 @@ export interface EngagementMetrics {
   hours_since_last_activity: number | null
   hours_since_last_contact: number | null
   hours_to_first_reply: number | null // desde case.opened al primer mensaje
+  sections_viewed: string[] // proposal.viewed.data.section (ej. "price")
 }
 
 export const COOLDOWN_MS = 24 * 60 * 60 * 1000
+
+// ISO 8601 UTC sin milisegundos (mismo formato que el kit).
+export function toIso(ms: number): string {
+  return new Date(ms).toISOString().replace('.000Z', 'Z')
+}
 
 export function buildContext(caseId: string, allEvents: CaseEvent[], now: string): CaseContext {
   const nowMs = Date.parse(now)
@@ -71,6 +77,7 @@ export function buildContext(caseId: string, allEvents: CaseEvent[], now: string
       hours_since_last_activity: null,
       hours_since_last_contact: null,
       hours_to_first_reply: null,
+      sections_viewed: [],
     },
   }
 
@@ -115,7 +122,7 @@ export function buildContext(caseId: string, allEvents: CaseEvent[], now: string
     ctx.messages_after_last_contact = ctx.messages.filter((m) => Date.parse(m.occurred_at) > t)
     const until = t + COOLDOWN_MS
     if (until > nowMs && ctx.messages_after_last_contact.length === 0) {
-      ctx.cooldown_until = new Date(until).toISOString()
+      ctx.cooldown_until = toIso(until)
     }
   }
 
@@ -123,6 +130,7 @@ export function buildContext(caseId: string, allEvents: CaseEvent[], now: string
   const openedAt = ctx.opened ? Date.parse(ctx.opened.occurred_at) : null
   const m = ctx.metrics
   m.view_count = ctx.views.length
+  m.sections_viewed = [...new Set(ctx.views.map((v) => v.data.section).filter((x): x is string => typeof x === 'string'))]
   if (openedAt !== null && ctx.views[0]) m.minutes_to_first_view = Math.round((Date.parse(ctx.views[0].occurred_at) - openedAt) / 60000)
   m.views_last_24h = ctx.views.filter((v) => nowMs - Date.parse(v.occurred_at) <= COOLDOWN_MS).length
   const last = events[events.length - 1]

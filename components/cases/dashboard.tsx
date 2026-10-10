@@ -108,11 +108,17 @@ export function Dashboard() {
           </div>
         </div>
         <div className="toolbar">
-          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'base' }, ingestMsg)}>
-            Cargar ejemplo
+          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'kit' }, ingestMsg)}>
+            Cargar kit oficial
+          </button>
+          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'kit-update' }, ingestMsg)}>
+            + updates.jsonl
+          </button>
+          <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'base' }, ingestMsg)} title="Datos inventados por el equipo">
+            Ejemplo extra
           </button>
           <button className="btn" disabled={busy} onClick={() => post('/api/events', { sample: 'update' }, ingestMsg)}>
-            + Nuevos eventos de ejemplo
+            + eventos extra
           </button>
           <button className="btn primary" disabled={busy} onClick={() => post('/api/evaluate', {}, (r) => `Reevaluados ${r.evaluated.length} casos.`)}>
             Evaluar
@@ -266,6 +272,7 @@ export function Dashboard() {
                   <div><span>Hrs a 1a respuesta</span><strong>{detail.metrics.hours_to_first_reply ?? '—'}</strong></div>
                   <div><span>Hrs desde ult. contacto</span><strong>{detail.metrics.hours_since_last_contact ?? '—'}</strong></div>
                   <div><span>Hrs sin actividad</span><strong>{detail.metrics.hours_since_last_activity ?? '—'}</strong></div>
+                  <div><span>Secciones vistas</span><strong>{detail.metrics.sections_viewed.join(', ') || '—'}</strong></div>
                 </div>
               </div>
 

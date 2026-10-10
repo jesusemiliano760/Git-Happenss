@@ -19,16 +19,18 @@ cp .env.example .env.local      # opcional: ANTHROPIC_API_KEY para usar Claude
 npm run dev                     # http://localhost:3000
 ```
 
-En la UI: **Cargar ejemplo** → revisa los casos → **+ Nuevos eventos de
-ejemplo** (reevaluacion y "que cambio") → **Exportar JSON**. Tambien puedes
-subir `events.jsonl` + `manifest.json` o pegar lineas JSONL.
+En la UI: **Cargar kit oficial** → revisa los casos → **+ updates.jsonl**
+(P06 cambia: reevaluacion y "que cambio") → **Exportar JSON**. Tambien puedes
+subir `events.jsonl` + `manifest.json` o pegar lineas JSONL. "Ejemplo extra"
+carga casos inventados por el equipo (instrucciones inyectadas, montos altos,
+enfriamiento R4, etc.).
 
 Sin UI (genera el entregable JSON):
 
 ```bash
-npm run decide                                   # usa data/kit/ si existe, si no data/sample/
-npm run decide -- data/kit/events.jsonl data/kit/manifest.json output/decisions.json
-npm test                                         # pruebas de reglas R1-R6, dedupe y errores
+npm run decide        # kit oficial + updates -> output/decisions-inicial.json y output/decisions.json
+npm run decide -- <events.jsonl> <manifest.json> <salida.json> [updates.jsonl ...]
+npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit oficial
 ```
 
 ### Variables de entorno (sin secretos en el repo)
@@ -54,6 +56,17 @@ npm test                                         # pruebas de reglas R1-R6, dedu
   contrato **antes de publicar**. Si algo falla, se sustituye por una
   alternativa segura (esperar / revision humana).
 
+## Resultado sobre el kit oficial (`output/decisions.json`)
+
+| Caso | Situacion | Recomendacion |
+|---|---|---|
+| P01 | Pregunta si incluye instalacion | `resolve_objection` inmediato |
+| P02 | Una apertura de la seccion de precio (duplicado ignorado) | `wait` 24h: una apertura no confirma intencion (R5) |
+| P03 | Pide no ser contactado antes del 12-oct 15:00 + restriccion | `wait` `at_date` 2026-10-12T15:00Z (igual a `ejemplo_salida.json`) |
+| P04 | "Me interesa" pero `contact_allowed=false` | `escalate` a revision humana, sin contactar (R2) |
+| P05 | Caso cerrado (accepted) | `no_action` (R1) |
+| P06 | Contacto hace 2h → con `updates.jsonl` llega una pregunta | `wait` (R4) → `resolve_objection` |
+
 ## Estructura
 
 ```
@@ -68,7 +81,7 @@ lib/store/           almacen en memoria con dedupe por event_id e historial de d
 lib/agent/           context (hechos + metricas), interpreter (IA), policy, agent (pipeline)
 lib/rules/           R1-R6 + validacion del contrato
 lib/decisions/       contrato de recomendacion
-data/kit/            aqui va el kit oficial
+data/kit/            kit oficial de participantes (sin modificar)
 data/sample/         datos de ejemplo del equipo (no oficiales)
 scripts/run-kit.ts   CLI que genera output/decisions.json
 tests/               pruebas de reglas
