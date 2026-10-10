@@ -45,7 +45,9 @@ npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit 
 
 El agente trabaja en memoria y **ademas** guarda en Supabase eventos,
 interpretaciones de la IA, decisiones (historial completo) y errores de
-formato; al reiniciar la app los vuelve a cargar. Si Supabase falla, la app
+formato; al reiniciar la app los vuelve a cargar. El boton **Reiniciar** guarda
+primero una copia de todo en `app_state` (llave `historial:<fecha>`, no se
+borra), limpia el resto y vuelve a cargar el kit oficial. Si Supabase falla, la app
 sigue en memoria y la barra superior muestra `BD: supabase (error)`.
 
 | Tabla | Contenido |
@@ -54,7 +56,7 @@ sigue en memoria y la barra superior muestra `BD: supabase (error)`.
 | `interpretations` | Lo que dijo la IA de cada mensaje (cache) |
 | `decisions` | Cada evaluacion; la ultima por caso es la vigente (vista `current_decisions`) |
 | `ingest_errors` | Lineas con error de formato |
-| `app_state` | `evaluation_at` del manifest |
+| `app_state` | `evaluation_at` del manifest, y una copia completa (`historial:<fecha>`) cada vez que se presiona **Reiniciar** |
 
 ### Publicar en Vercel
 
