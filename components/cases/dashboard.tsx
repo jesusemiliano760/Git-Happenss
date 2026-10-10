@@ -51,6 +51,8 @@ export function Dashboard() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [paste, setPaste] = useState('')
+  const [liveCase, setLiveCase] = useState('')
+  const [liveText, setLiveText] = useState('')
 
   const refresh = useCallback(async () => {
     const res: CasesResponse = await fetch('/api/cases').then((r) => r.json())
@@ -95,6 +97,24 @@ export function Dashboard() {
       else jsonl += text + '\n'
     }
     await post('/api/events', { jsonl, manifest }, ingestMsg)
+  }
+
+  // Simula al cliente escribiendo en vivo: el texto normal se convierte en un
+  // evento message.received del caso elegido (con la hora de evaluacion para
+  // que no quede "en el futuro") y se manda por la misma ruta que el JSONL.
+  async function sendLiveMessage() {
+    const caseId = (liveCase || selected || '').trim()
+    if (!caseId || !liveText.trim()) return
+    const event = {
+      event_id: `vivo-${Date.now()}`,
+      case_id: caseId,
+      event_type: 'message.received',
+      occurred_at: data?.evaluationTime ?? new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+      data: { message: liveText.trim() },
+    }
+    await post('/api/events', { jsonl: JSON.stringify(event) }, ingestMsg)
+    setLiveText('')
+    setSelected(caseId)
   }
 
   const rec = detail?.current?.recommendation
@@ -160,6 +180,18 @@ export function Dashboard() {
             <p className="empty">Sin casos. Carga un events.jsonl o el ejemplo.</p>
           )}
           <div className="upload">
+            <label>Mensaje del cliente (texto normal)</label>
+            <select value={liveCase || selected || ''} onChange={(e) => setLiveCase(e.target.value)}>
+              {(data?.cases ?? []).map((c) => (
+                <option key={c.case_id} value={c.case_id}>
+                  {c.case_id}
+                </option>
+              ))}
+            </select>
+            <textarea className="plain" value={liveText} onChange={(e) => setLiveText(e.target.value)} placeholder="Ej.: ¿Tienen descuento si pago de contado?" />
+            <button className="btn" disabled={busy || !liveText.trim() || !(liveCase || selected)} onClick={sendLiveMessage}>
+              Enviar mensaje
+            </button>
             <label>Cargar archivos (events.jsonl y manifest.json)</label>
             <input type="file" multiple accept=".jsonl,.json,.txt" onChange={(e) => onFiles(e.target.files)} />
             <label>O pega lineas JSONL</label>

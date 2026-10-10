@@ -56,6 +56,22 @@ sigue en memoria y la barra superior muestra `BD: supabase (error)`.
 | `ingest_errors` | Lineas con error de formato |
 | `app_state` | `evaluation_at` del manifest |
 
+### Publicar en Vercel
+
+GitHub Pages no sirve (el agente necesita servidor). Con Vercel:
+
+1. vercel.com → **Continue with GitHub** → **Add New → Project** → importar
+   este repo (lo hace la cuenta duena del repo o quien tenga la app de Vercel
+   instalada en el).
+2. En **Environment Variables** agregar las mismas de `.env.local`
+   (`GEMINI_API_KEY`, `GEMINI_MODEL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`).
+3. **Deploy**. Cada cambio en `main` se vuelve a publicar solo.
+
+Notas: en Vercel conviene tener Supabase configurado, porque el servidor
+corre en varias copias y cada peticion lee el estado desde la BD; sin
+Supabase cada copia tiene su propia memoria. Los archivos de `data/` se
+incluyen en el build via `outputFileTracingIncludes` (`next.config.mjs`).
+
 ### Variables de entorno (sin secretos en el repo)
 
 | Variable | Uso |

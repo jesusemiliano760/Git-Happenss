@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ready, store } from '@/lib/store/server'
+import { getStore } from '@/lib/store/server'
 import { storageStatus } from '@/lib/store/supabase-sync'
 import { resolveEvaluationTime } from '@/lib/agent/run'
 import { activeProvider } from '@/lib/agent/interpreter'
@@ -7,7 +7,7 @@ import { activeProvider } from '@/lib/agent/interpreter'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  await ready()
+  const store = await getStore()
   const cases = store.caseIds().map((id) => {
     const current = store.currentDecision(id)
     const events = store.events(id)
