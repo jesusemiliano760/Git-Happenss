@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { store } from '@/lib/store/memory-store'
+import { ready, resetAll } from '@/lib/store/server'
 
 export async function POST() {
-  store.reset()
+  await ready()
+  await resetAll()
   return NextResponse.json({ ok: true })
 }

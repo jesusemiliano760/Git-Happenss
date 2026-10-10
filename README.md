@@ -15,7 +15,8 @@ Requisitos: Node 20+.
 
 ```bash
 npm install
-cp .env.example .env.local      # opcional: ANTHROPIC_API_KEY para usar Claude
+cp .env.example .env.local      # pon tu GEMINI_API_KEY ahi
+npm run check:ia                # verifica que la llave de Gemini funcione
 npm run dev                     # http://localhost:3000
 ```
 
@@ -33,22 +34,47 @@ npm run decide -- <events.jsonl> <manifest.json> <salida.json> [updates.jsonl ..
 npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit oficial
 ```
 
+### Base de datos (Supabase, opcional)
+
+1. En Supabase: **SQL Editor → New query**, pega `supabase/schema.sql` y **Run**.
+2. En `.env.local` pon `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (llave secreta /
+   service_role, solo servidor).
+3. `npm run check:db` → debe decir `OK` y listar las 5 tablas.
+
+El agente trabaja en memoria y **ademas** guarda en Supabase eventos,
+interpretaciones de la IA, decisiones (historial completo) y errores de
+formato; al reiniciar la app los vuelve a cargar. Si Supabase falla, la app
+sigue en memoria y la barra superior muestra `BD: supabase (error)`.
+
+| Tabla | Contenido |
+|---|---|
+| `events` | Eventos del JSONL; `event_id` es llave primaria (dedupe en la BD) |
+| `interpretations` | Lo que dijo la IA de cada mensaje (cache) |
+| `decisions` | Cada evaluacion; la ultima por caso es la vigente (vista `current_decisions`) |
+| `ingest_errors` | Lineas con error de formato |
+| `app_state` | `evaluation_at` del manifest |
+
 ### Variables de entorno (sin secretos en el repo)
 
 | Variable | Uso |
 |---|---|
-| `ANTHROPIC_API_KEY` | Activa el modo **live** (Claude interpreta los mensajes). Sin ella, modo **fallback** heuristico. |
-| `ANTHROPIC_MODEL` | Opcional, default `claude-opus-5-5`. |
+| `GEMINI_API_KEY` | Activa el modo **live**: Gemini interpreta los mensajes. Sin ella, modo **fallback** heuristico. |
+| `GEMINI_MODEL` | Opcional, default `gemini-2.5-flash`. |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Alternativa: Claude, solo si no hay llave de Gemini. |
+| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Activan la persistencia en Supabase (opcional). |
 | `AGENT_MODE=fallback` | Fuerza el modo sin IA (pruebas reproducibles). |
 | `HIGH_VALUE_MXN` | Umbral de monto para pedir revision humana (default 500000). |
 
 ## Como se usa la IA
 
-- **La IA interpreta, las reglas deciden lo permitido.** Claude clasifica cada
+- **La IA interpreta, las reglas deciden lo permitido.** Gemini (`@google/genai`,
+  `generateContent` con `responseJsonSchema`) clasifica cada
   `message.received` con salida estructurada (JSON validado por esquema):
   intencion, objecion, fecha pedida para retomar, hechos vs inferencias,
   informacion faltante, confianza y si el texto parece una instruccion
-  inyectada. El mensaje va delimitado y se trata como dato.
+  inyectada. El mensaje va delimitado y se trata como dato. La respuesta se
+  valida otra vez con Zod y se guarda por `event_id` (no se paga dos veces el
+  mismo mensaje).
 - Si no hay API key o la llamada falla, un clasificador heuristico en español
   produce la misma estructura (`source: "heuristic"`). La app nunca se cae.
 - La politica (`lib/agent/policy.ts`) combina hechos + inferencias y propone
@@ -77,7 +103,8 @@ app/                 Next.js (UI + API)
   api/export         decisiones en JSON (contrato seccion 6)
 components/cases/    dashboard y traza del agente
 lib/events/          contrato de entrada y validacion por linea
-lib/store/           almacen en memoria con dedupe por event_id e historial de decisiones
+lib/store/           almacen en memoria (dedupe, historial) + sincronizacion con Supabase
+supabase/schema.sql  tablas para Supabase
 lib/agent/           context (hechos + metricas), interpreter (IA), policy, agent (pipeline)
 lib/rules/           R1-R6 + validacion del contrato
 lib/decisions/       contrato de recomendacion
@@ -89,4 +116,4 @@ docs/                nota tecnica, demo, notas del audio, rescate de Banorte One
 ```
 
 Ver `docs/NOTA_TECNICA.md` (entregable de 1 pagina), `docs/DEMO.md`,
-`docs/NOTAS_AUDIO.md` y `docs/RESCATE_BANORTE.md`.
+y `docs/NOTAS_AUDIO.md`.

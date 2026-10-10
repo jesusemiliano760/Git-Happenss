@@ -73,6 +73,11 @@ export class CaseStore {
     return this.errors
   }
 
+  // Usado al recuperar los errores guardados en Supabase.
+  restoreErrors(errors: EventValidationError[]) {
+    this.errors.push(...errors)
+  }
+
   reset() {
     this.seen.clear()
     this.byCase.clear()

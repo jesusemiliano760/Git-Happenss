@@ -11,6 +11,7 @@ import { CaseStore } from '@/lib/store/memory-store'
 import { evaluateCases, exportDecisions } from '@/lib/agent/run'
 import { diffDecisions } from '@/lib/agent/agent'
 import { manifestEvaluationTime } from '@/lib/events/types'
+import { activeProvider } from '@/lib/agent/interpreter'
 
 const args = process.argv.slice(2)
 const kitDir = fs.existsSync('data/kit/events.jsonl') ? 'data/kit' : 'data/sample'
@@ -28,6 +29,7 @@ async function main() {
   console.log(`Eventos: ${res.accepted.length} aceptados, ${res.duplicates.length} duplicados, ${res.errors.length} con error`)
   for (const e of res.errors) console.log(`  linea ${e.line}: ${e.error}`)
   console.log(`Hora de evaluacion: ${store.evaluationTime ?? '(sin manifest)'}`)
+  console.log(`IA: ${activeProvider() ?? 'heuristica (sin llave)'}`)
 
   const first = await evaluateCases(store)
   printTable(first)

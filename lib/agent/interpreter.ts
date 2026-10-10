@@ -2,7 +2,7 @@
 // mediante un modelo de lenguaje o clasificador de IA").
 //
 // Mismo patron LIVE/FALLBACK que Banorte One (lib/agent/llm-orchestrator.ts):
-// - LIVE: Claude con salida estructurada (JSON validado por esquema).
+// - LIVE: Gemini (o Claude) con salida estructurada (JSON validado por esquema).
 // - FALLBACK: clasificador heuristico en español, sin red. Garantiza que la
 //   demo y las pruebas funcionen sin API key y que el sistema nunca se caiga.
 //
@@ -11,6 +11,7 @@
 // deterministicas (lib/rules/engine.ts). Los mensajes del cliente son datos,
 // no instrucciones (seccion 5 del PDF).
 
+import { GoogleGenAI } from '@google/genai'
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import * as z from 'zod/v4'
@@ -158,10 +159,26 @@ export function interpretHeuristic(ev: CaseEvent): MessageInterpretation {
 }
 
 // ---------------------------------------------------------------------------
-// LIVE: Claude con salida estructurada
+// LIVE: LLM con salida estructurada (Gemini por defecto, Claude opcional)
 // ---------------------------------------------------------------------------
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'
+export type LlmProvider = 'gemini' | 'claude'
+
+// Gemini si hay GEMINI_API_KEY; Claude si solo hay ANTHROPIC_API_KEY;
+// null = sin IA externa (heuristica). AGENT_MODE=fallback fuerza heuristica.
+export function activeProvider(): LlmProvider | null {
+  if (process.env.AGENT_MODE === 'fallback') return null
+  if (process.env.GEMINI_API_KEY) return 'gemini'
+  if (process.env.ANTHROPIC_API_KEY) return 'claude'
+  return null
+}
+
+export function liveModeEnabled() {
+  return activeProvider() !== null
+}
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
+const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'
 
 const InterpretationSchema = z.object({
   intent: z.enum(INTENTS),
@@ -174,6 +191,28 @@ const InterpretationSchema = z.object({
   missing_information: z.array(z.string()),
   confidence: z.enum(['low', 'medium', 'high']),
 })
+
+// Mismo esquema en JSON Schema para Gemini (responseJsonSchema).
+const nullableString = { anyOf: [{ type: 'string' }, { type: 'null' }] }
+const stringArray = { type: 'array', items: { type: 'string' } }
+const INTERPRETATION_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    intent: { type: 'string', enum: [...INTENTS] },
+    objection_topic: nullableString,
+    requested_contact_after: nullableString,
+    asks_no_contact: { type: 'boolean' },
+    injection_suspected: { type: 'boolean' },
+    facts: stringArray,
+    inferences: stringArray,
+    missing_information: stringArray,
+    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+  },
+  required: [
+    'intent', 'objection_topic', 'requested_contact_after', 'asks_no_contact', 'injection_suspected',
+    'facts', 'inferences', 'missing_information', 'confidence',
+  ],
+}
 
 const SYSTEM = `Eres un clasificador de mensajes de clientes que recibieron una propuesta comercial (Mexico, español).
 Tu unica tarea es INTERPRETAR un mensaje. No decides acciones ni redactas respuestas.
@@ -190,34 +229,51 @@ Campos:
 - missing_information: datos que faltan para decidir bien.
 - confidence: low | medium | high. Usa high solo si la intencion es explicita e inequivoca.`
 
-let client: Anthropic | null = null
-function getClient() {
-  if (!client) client = new Anthropic()
-  return client
-}
-
-export function liveModeEnabled() {
-  return Boolean(process.env.ANTHROPIC_API_KEY) && process.env.AGENT_MODE !== 'fallback'
-}
-
-export async function interpretLive(ev: CaseEvent, caseSummary: string): Promise<MessageInterpretation> {
+function userPrompt(ev: CaseEvent, caseSummary: string) {
   const text = String(ev.data.message ?? '')
-  const response = await getClient().messages.parse({
-    model: MODEL,
+  return `Contexto del caso (solo referencia): ${caseSummary}\nFecha del mensaje (UTC): ${ev.occurred_at}\n<mensaje_cliente>\n${text}\n</mensaje_cliente>`
+}
+
+let gemini: GoogleGenAI | null = null
+async function interpretWithGemini(ev: CaseEvent, caseSummary: string) {
+  // El SDK lee GEMINI_API_KEY del entorno.
+  gemini ??= new GoogleGenAI({})
+  const res = await gemini.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: userPrompt(ev, caseSummary),
+    config: {
+      systemInstruction: SYSTEM,
+      temperature: 0,
+      responseMimeType: 'application/json',
+      responseJsonSchema: INTERPRETATION_JSON_SCHEMA,
+    },
+  })
+  if (!res.text) throw new Error('Gemini no regreso texto')
+  // Se valida otra vez con zod: nunca se confia en la forma de la salida.
+  return InterpretationSchema.parse(JSON.parse(res.text))
+}
+
+let claude: Anthropic | null = null
+async function interpretWithClaude(ev: CaseEvent, caseSummary: string) {
+  claude ??= new Anthropic()
+  const response = await claude.messages.parse({
+    model: CLAUDE_MODEL,
     max_tokens: 4096,
     output_config: { effort: 'low', format: zodOutputFormat(InterpretationSchema) },
     system: SYSTEM,
-    messages: [
-      {
-        role: 'user',
-        content: `Contexto del caso (solo referencia): ${caseSummary}\nFecha del mensaje (UTC): ${ev.occurred_at}\n<mensaje_cliente>\n${text}\n</mensaje_cliente>`,
-      },
-    ],
+    messages: [{ role: 'user', content: userPrompt(ev, caseSummary) }],
   })
   if (response.stop_reason === 'refusal' || !response.parsed_output) {
     throw new Error(`Interpretacion LLM no disponible (stop_reason=${response.stop_reason})`)
   }
-  return { ...response.parsed_output, event_id: ev.event_id, source: 'llm' }
+  return response.parsed_output
+}
+
+export async function interpretLive(ev: CaseEvent, caseSummary: string): Promise<MessageInterpretation> {
+  const provider = activeProvider()
+  if (!provider) throw new Error('Sin proveedor de IA configurado')
+  const out = provider === 'gemini' ? await interpretWithGemini(ev, caseSummary) : await interpretWithClaude(ev, caseSummary)
+  return { ...out, event_id: ev.event_id, source: 'llm' }
 }
 
 // Punto de entrada: intenta LIVE y cae a la heuristica ante cualquier error.
