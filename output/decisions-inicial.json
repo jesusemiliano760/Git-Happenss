@@ -9,8 +9,8 @@
       "P01-e2",
       "P01-e1"
     ],
-    "confidence": "medium",
-    "confidence_reason": "Basado en la interpretación (reglas de respaldo) del mensaje P01-e2. El cliente hace una pregunta o pide información.",
+    "confidence": "high",
+    "confidence_reason": "Basado en la interpretación (IA) del mensaje P01-e2. El cliente está evaluando el alcance de la propuesta comercial.",
     "risk_level": "medium",
     "requires_human_review": false,
     "missing_information": []
@@ -94,7 +94,7 @@
     "risk_level": "low",
     "requires_human_review": false,
     "missing_information": [
-      "Respuesta explícita del cliente: solo hay señales indirectas (aperturas)"
+      "Respuesta del cliente: no hay mensajes ni aperturas registradas"
     ]
   }
 ]

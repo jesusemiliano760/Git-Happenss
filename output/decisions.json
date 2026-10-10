@@ -9,8 +9,8 @@
       "P01-e2",
       "P01-e1"
     ],
-    "confidence": "medium",
-    "confidence_reason": "Basado en la interpretación (reglas de respaldo) del mensaje P01-e2. El cliente hace una pregunta o pide información.",
+    "confidence": "high",
+    "confidence_reason": "Basado en la interpretación (IA) del mensaje P01-e2. El cliente está evaluando el alcance de la propuesta comercial.",
     "risk_level": "medium",
     "requires_human_review": false,
     "missing_information": []
@@ -91,10 +91,12 @@
       "P06-e2",
       "P06-e1"
     ],
-    "confidence": "medium",
-    "confidence_reason": "Basado en la interpretación (reglas de respaldo) del mensaje P06-e3. El cliente hace una pregunta o pide información.",
+    "confidence": "high",
+    "confidence_reason": "Basado en la interpretación (IA) del mensaje P06-e3. El cliente está evaluando la propuesta pero necesita conocer los tiempos de entrega para avanzar",
     "risk_level": "medium",
     "requires_human_review": false,
-    "missing_information": []
+    "missing_information": [
+      "Fecha de entrega que figuraba en la propuesta original"
+    ]
   }
 ]
