@@ -9,7 +9,7 @@ publicacion. Cada evaluacion se guarda; la anterior se conserva para mostrar
 el diff. La hora "actual" es `manifest.evaluation_at` (nunca el reloj real),
 y los eventos posteriores a esa hora se ignoran.
 
-**IA utilizada.** Gemini (`gemini-2.5-flash` por defecto, configurable con
+**IA utilizada.** Gemini (`gemini-3.8-flash` por defecto, configurable con
 `GEMINI_MODEL`) via `@google/genai`, `generateContent` con
 `responseMimeType: application/json` y `responseJsonSchema`, temperatura 0; la
 salida se revalida con Zod. Claude queda como alternativa si no hay llave de
@@ -43,7 +43,9 @@ cuando depende de un mensaje; `low` cuando solo hay aperturas o el mensaje es
 ambiguo. Riesgo = costo de equivocarse al intervenir o al esperar: alto si el
 cliente espera respuesta y el contacto esta bloqueado o el monto es alto
 (≥ `HIGH_VALUE_MXN`); bajo si esperar no pierde nada. Revision humana en
-escalamientos, montos altos, rechazos y texto con forma de instruccion.
+escalamientos, montos altos y rechazos. Si el ultimo mensaje tiene forma de
+instruccion ("ignora tus reglas..."), se recomienda `no_action` sin revision
+humana: no se obedece ni se escala.
 
 **Incertidumbre y limitaciones.** Sin calibracion estadistica. Heuristica
 basada en palabras clave (el modo live es mas robusto). Persistencia opcional en
