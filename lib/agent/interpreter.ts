@@ -177,7 +177,7 @@ export function liveModeEnabled() {
   return activeProvider() !== null
 }
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.8-flash'
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-opus-5-5'
 
 const InterpretationSchema = z.object({
@@ -269,10 +269,24 @@ async function interpretWithClaude(ev: CaseEvent, caseSummary: string) {
   return response.parsed_output
 }
 
+// Limite por llamada: si la IA tarda (p. ej. Gemini saturado con 503 y
+// reintentos), se corta y interpretMessage cae a la heuristica en vez de
+// congelar la carga de eventos.
+const LLM_TIMEOUT_MS = (Number(process.env.LLM_TIMEOUT_SECONDS) || 20) * 1000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`La IA no respondio en ${ms / 1000}s`)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 export async function interpretLive(ev: CaseEvent, caseSummary: string): Promise<MessageInterpretation> {
   const provider = activeProvider()
   if (!provider) throw new Error('Sin proveedor de IA configurado')
-  const out = provider === 'gemini' ? await interpretWithGemini(ev, caseSummary) : await interpretWithClaude(ev, caseSummary)
+  const call = provider === 'gemini' ? interpretWithGemini(ev, caseSummary) : interpretWithClaude(ev, caseSummary)
+  const out = await withTimeout(call, LLM_TIMEOUT_MS)
   return { ...out, event_id: ev.event_id, source: 'llm' }
 }
 
