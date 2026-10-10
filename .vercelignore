@@ -1,0 +1,8 @@
+# Lo que `npx vercel` NO debe subir desde tu computadora.
+# Las llaves van en Vercel > Settings > Environment Variables, nunca en archivos.
+.env
+.env*.local
+node_modules
+.next
+.vercel
+*.tsbuildinfo
