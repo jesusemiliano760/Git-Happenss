@@ -20,9 +20,22 @@ import {
   supabaseEnabled,
 } from './supabase-sync'
 
+// Con Supabase, la BD se lee una sola vez al arrancar el servidor; despues se
+// trabaja en memoria y solo se escribe lo nuevo (antes se releian todas las
+// tablas en cada clic, y cada vez tardaba mas porque las decisiones crecen).
+// Si el servidor corre en varias copias (Vercel), SUPABASE_RELOAD=always
+// vuelve a leer la BD en cada peticion.
+const g = globalThis as unknown as { __loadedStore?: CaseStore }
+
 export async function getStore(): Promise<CaseStore> {
   if (!supabaseEnabled()) return memoryStore
-  return (await loadStoreFromSupabase(interpCache)) ?? memoryStore
+  if (process.env.SUPABASE_RELOAD === 'always') return (await loadStoreFromSupabase(interpCache)) ?? memoryStore
+  if (!g.__loadedStore) {
+    const loaded = await loadStoreFromSupabase(interpCache)
+    if (!loaded) return memoryStore
+    g.__loadedStore = loaded
+  }
+  return g.__loadedStore
 }
 
 export async function saveIngest(store: CaseStore, result: IngestResult) {
@@ -50,6 +63,7 @@ export async function resetAll() {
     }
   }))
   memoryStore.reset()
+  g.__loadedStore = memoryStore
   for (const id of [...interpCache.keys()]) if (!kitIds.has(id)) interpCache.delete(id)
   await clearSupabase()
   return { archivedAs }
