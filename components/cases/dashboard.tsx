@@ -21,6 +21,7 @@ interface CasesResponse {
   evaluationTime: string | null
   mode: 'live' | 'fallback'
   provider: 'gemini' | 'claude' | null
+  storage: { backend: 'supabase' | 'memoria'; lastError: string | null }
 }
 
 interface CaseDetail {
@@ -105,7 +106,7 @@ export function Dashboard() {
         <div>
           <h1>Git Happens · What Should Happen Next?</h1>
           <div className="sub">
-            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.provider === 'gemini' ? 'Gemini (live)' : data?.provider === 'claude' ? 'Claude (live)' : 'heuristica (fallback)'}</span>
+            Hora de evaluacion: {fmt(data?.evaluationTime)} · <span className="mode-pill">IA: {data?.provider === 'gemini' ? 'Gemini (live)' : data?.provider === 'claude' ? 'Claude (live)' : 'heuristica (fallback)'}</span> <span className="mode-pill" title={data?.storage.lastError ?? ''}>BD: {data?.storage.backend ?? '—'}{data?.storage.lastError ? ' (error)' : ''}</span>
           </div>
         </div>
         <div className="toolbar">

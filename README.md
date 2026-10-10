@@ -34,6 +34,26 @@ npm run decide -- <events.jsonl> <manifest.json> <salida.json> [updates.jsonl ..
 npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit oficial
 ```
 
+### Base de datos (Supabase, opcional)
+
+1. En Supabase: **SQL Editor → New query**, pega `supabase/schema.sql` y **Run**.
+2. En `.env.local` pon `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (llave secreta /
+   service_role, solo servidor).
+3. `npm run check:db` → debe decir `OK` y listar las 5 tablas.
+
+El agente trabaja en memoria y **ademas** guarda en Supabase eventos,
+interpretaciones de la IA, decisiones (historial completo) y errores de
+formato; al reiniciar la app los vuelve a cargar. Si Supabase falla, la app
+sigue en memoria y la barra superior muestra `BD: supabase (error)`.
+
+| Tabla | Contenido |
+|---|---|
+| `events` | Eventos del JSONL; `event_id` es llave primaria (dedupe en la BD) |
+| `interpretations` | Lo que dijo la IA de cada mensaje (cache) |
+| `decisions` | Cada evaluacion; la ultima por caso es la vigente (vista `current_decisions`) |
+| `ingest_errors` | Lineas con error de formato |
+| `app_state` | `evaluation_at` del manifest |
+
 ### Variables de entorno (sin secretos en el repo)
 
 | Variable | Uso |
@@ -41,6 +61,7 @@ npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit 
 | `GEMINI_API_KEY` | Activa el modo **live**: Gemini interpreta los mensajes. Sin ella, modo **fallback** heuristico. |
 | `GEMINI_MODEL` | Opcional, default `gemini-2.5-flash`. |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Alternativa: Claude, solo si no hay llave de Gemini. |
+| `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Activan la persistencia en Supabase (opcional). |
 | `AGENT_MODE=fallback` | Fuerza el modo sin IA (pruebas reproducibles). |
 | `HIGH_VALUE_MXN` | Umbral de monto para pedir revision humana (default 500000). |
 
@@ -82,7 +103,8 @@ app/                 Next.js (UI + API)
   api/export         decisiones en JSON (contrato seccion 6)
 components/cases/    dashboard y traza del agente
 lib/events/          contrato de entrada y validacion por linea
-lib/store/           almacen en memoria con dedupe por event_id e historial de decisiones
+lib/store/           almacen en memoria (dedupe, historial) + sincronizacion con Supabase
+supabase/schema.sql  tablas para Supabase
 lib/agent/           context (hechos + metricas), interpreter (IA), policy, agent (pipeline)
 lib/rules/           R1-R6 + validacion del contrato
 lib/decisions/       contrato de recomendacion

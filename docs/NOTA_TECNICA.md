@@ -46,8 +46,9 @@ cliente espera respuesta y el contacto esta bloqueado o el monto es alto
 escalamientos, montos altos, rechazos y texto con forma de instruccion.
 
 **Incertidumbre y limitaciones.** Sin calibracion estadistica. Heuristica
-basada en palabras clave (el modo live es mas robusto). Almacen en memoria (se
-pierde al reiniciar). Sin aprendizaje a partir de resultados aun
+basada en palabras clave (el modo live es mas robusto). Persistencia opcional en
+Supabase (escritura posterior a memoria; con varias instancias del servidor
+cada una carga los datos al arrancar). Sin aprendizaje a partir de resultados aun
 (ver `docs/NOTAS_AUDIO.md`: retroalimentacion y perfiles como siguiente paso).
 Una o dos aperturas en menos de 24h desde el envio se tratan como señal debil
 (se espera 24h); esto es una decision de diseño, no una regla del kit.

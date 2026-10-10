@@ -19,7 +19,7 @@ import type { DecisionRecord, Recommendation, TraceEntry } from '@/lib/decisions
 // Cache de interpretaciones por event_id: un mensaje no cambia, asi que no se
 // vuelve a mandar al LLM en cada reevaluacion.
 const g = globalThis as unknown as { __interpCache?: Map<string, MessageInterpretation> }
-const interpCache: Map<string, MessageInterpretation> = g.__interpCache ?? (g.__interpCache = new Map())
+export const interpCache: Map<string, MessageInterpretation> = g.__interpCache ?? (g.__interpCache = new Map())
 
 export async function evaluateCase(caseId: string, events: CaseEvent[], now: string): Promise<DecisionRecord> {
   const trace: TraceEntry[] = []

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
-import { store } from '@/lib/store/memory-store'
+import { ready, store } from '@/lib/store/server'
+import { storageStatus } from '@/lib/store/supabase-sync'
 import { resolveEvaluationTime } from '@/lib/agent/run'
 import { activeProvider } from '@/lib/agent/interpreter'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  await ready()
   const cases = store.caseIds().map((id) => {
     const current = store.currentDecision(id)
     const events = store.events(id)
@@ -24,5 +26,6 @@ export async function GET() {
     evaluationTime: store.caseIds().length ? resolveEvaluationTime(store) : store.evaluationTime,
     mode: activeProvider() ? 'live' : 'fallback',
     provider: activeProvider(),
+    storage: storageStatus(),
   })
 }

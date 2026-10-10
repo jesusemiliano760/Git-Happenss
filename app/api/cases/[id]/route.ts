@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { store } from '@/lib/store/memory-store'
+import { ready, store } from '@/lib/store/server'
 import { diffDecisions } from '@/lib/agent/agent'
 import { buildContext } from '@/lib/agent/context'
 import { resolveEvaluationTime } from '@/lib/agent/run'
@@ -7,6 +7,7 @@ import { resolveEvaluationTime } from '@/lib/agent/run'
 export const dynamic = 'force-dynamic'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await ready()
   const { id } = await params
   const events = store.events(id)
   if (!events.length) return NextResponse.json({ error: 'Caso no encontrado' }, { status: 404 })
