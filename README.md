@@ -26,7 +26,7 @@ subir `events.jsonl` + `manifest.json` o pegar lineas JSONL. "Ejemplo extra"
 carga casos inventados por el equipo (instrucciones inyectadas, montos altos,
 enfriamiento R4, etc.).
 
-Sin UI (genera el entregable JSON):
+Sin UI :
 
 ```bash
 npm run decide        # kit oficial + updates -> output/decisions-inicial.json y output/decisions.json
@@ -34,7 +34,7 @@ npm run decide -- <events.jsonl> <manifest.json> <salida.json> [updates.jsonl ..
 npm test              # reglas R1-R6, dedupe, errores y regresion contra el kit oficial
 ```
 
-### Base de datos (Supabase, opcional)
+### Base de datos Supabase
 
 1. En Supabase: **SQL Editor → New query**, pega `supabase/schema.sql` y **Run**.
 2. En `.env.local` pon `SUPABASE_URL` y `SUPABASE_SECRET_KEY` (llave secreta /
